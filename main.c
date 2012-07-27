@@ -1,6 +1,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 struct exp;
 struct env;
@@ -18,23 +19,33 @@ int main(int argc, char **argv) {
 }
 
 enum exp_type {
-  ATOM,
-  PAIR
+  PAIR,
+  FIXNUM,
+  SYMBOL
 };
 
 struct exp {
   enum exp_type type;
   union {
-    char *atom;
     struct {
       struct exp *first;
       struct exp *rest;
     } pair;
+    long fixnum;
+    char *symbol;
   } value;
 };
 
-static struct exp nil = { PAIR };
+static struct exp nil;
 #define NIL (&nil)
+
+/*
+static struct exp true;
+#define TRUE (&true)
+
+static struct exp false;
+#define FALSE (&false)
+*/
 
 static void eat_space(void);
 static struct exp *read_atom(void);
@@ -68,12 +79,7 @@ static void eat_space(void) {
   }
 }
 
-static struct exp *make_atom(char *atom) {
-  struct exp *e = malloc(sizeof *e);
-  e->type = ATOM;
-  e->value.atom = atom;
-  return e;
-}
+static struct exp *make_atom(char *buf);
 
 static struct exp *read_atom(void) {
   size_t len = 0;
@@ -96,13 +102,7 @@ static struct exp *read_atom(void) {
   }
 }
 
-static struct exp *make_pair(void) {
-  struct exp *pair = malloc(sizeof *pair);
-  pair->type = PAIR;
-  pair->value.pair.first = NULL;
-  pair->value.pair.rest = NULL;
-  return pair;
-}
+static struct exp *make_pair(void);
 
 static struct exp *read_pair(void) {
   struct exp *pair;
@@ -119,14 +119,58 @@ static struct exp *read_pair(void) {
   }
 }
 
+static struct exp *make_atom(char *buf) {
+  size_t len = strlen(buf);
+  size_t i = buf[0] == '-' ? 1 : 0;
+  struct exp *e = malloc(sizeof *e);
+  e->type = SYMBOL;
+  for (; i < len; i += 1) {
+    if (isdigit(buf[i])) {
+      e->type = FIXNUM;
+    } else {
+      e->type = SYMBOL;
+      break;
+    }
+  }
+  switch (e->type) {
+  case SYMBOL:
+    e->value.symbol = buf;
+    break;
+  case FIXNUM:
+    // not handling overflow
+    e->value.fixnum = strtol(buf, NULL, 10);
+    break;
+  default:
+    fprintf(stderr, "unexpected atom type\n");
+    exit(1);
+  }
+  return e;
+}
+
+static struct exp *make_pair(void) {
+  struct exp *pair = malloc(sizeof *pair);
+  pair->type = PAIR;
+  pair->value.pair.first = NULL;
+  pair->value.pair.rest = NULL;
+  return pair;
+}
+
 static struct exp *eval(struct exp *exp, struct env *env) {
-  return exp;
+  if (exp) {
+    return exp;
+  } else {
+    fprintf(stderr, "unknown exp type\n");
+    exit(1);
+  }
 }
 
 static void print(struct exp *exp) {
   switch (exp->type) {
-  case ATOM:
-    printf("%s\n", exp->value.atom);
+  case SYMBOL:
+    printf("%s\n", exp->value.symbol);
+    break;
+  case FIXNUM:
+    printf("%ld\n", exp->value.fixnum);
     break;
   case PAIR:
     while (exp != NIL) {
