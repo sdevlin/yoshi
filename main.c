@@ -155,13 +155,37 @@ static struct exp *make_pair(void) {
   return pair;
 }
 
+static int self_eval_p(struct exp *exp);
+static int var_p(struct exp *exp);
+static int quoted_p(struct exp *exp);
+
 static struct exp *eval(struct exp *exp, struct env *env) {
-  if (exp) {
+  if (self_eval_p(exp)) {
     return exp;
+  } else if (var_p(exp)) {
+    return NULL; // lookup_var(exp, env);
+  } else if (quoted_p(exp)) {
+    return NULL; // quote_text(exp);
   } else {
     fprintf(stderr, "unknown exp type\n");
     exit(1);
   }
+}
+
+static int self_eval_p(struct exp *exp) {
+  return exp->type == FIXNUM;
+}
+
+static int var_p(struct exp *exp) {
+  return exp->type == SYMBOL;
+}
+
+static int symbol_eq(struct exp *exp, const char *s) {
+  return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
+}
+
+static int quoted_p(struct exp *exp) {
+  return exp->type == PAIR && symbol_eq(exp->value.pair.first, "quote");
 }
 
 static void print(struct exp *exp) {
