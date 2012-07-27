@@ -13,7 +13,7 @@ static void print(struct exp *exp);
 int main(int argc, char **argv) {
   struct exp *e;
   for (;;) {
-    printf("> ");
+    printf("lisp> ");
     if ((e = read()) == NULL) {
       return 0;
     }
@@ -162,6 +162,9 @@ static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_app(struct exp *exp);
+static struct exp *car(struct exp *exp);
+static struct exp *cdr(struct exp *exp);
+static struct exp *nth(struct exp *exp);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -171,19 +174,23 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_tagged(exp, "quote")) {
     return NULL; // quote_text(exp);
   } else if (is_tagged(exp, "set!")) {
-    return NULL;
+    return NULL; // update_var(nth(exp, 1), eval(nth(exp, 2), env), env);
   } else if (is_tagged(exp, "define")) {
-    return NULL;
+    return NULL; // define_var(nth(exp, 1), eval(nth(exp, 2), env), env);
   } else if (is_tagged(exp, "if")) {
-    return NULL;
+    if (eval(nth(exp, 1), env) != FALSE) {
+      return eval(nth(exp, 2), env);
+    } else {
+      return eval(nth(exp, 3), env);
+    }
   } else if (is_tagged(exp, "lambda")) {
-    return NULL;
+    return NULL; // make_proc
   } else if (is_tagged(exp, "begin")) {
-    return NULL;
+    return NULL; // eval all and return last
   } else if (is_tagged(exp, "cond")) {
-    return NULL;
+    return NULL; // eval(cond_to_if(exp), env);
   } else if (is_app(exp)) {
-    return NULL;
+    return NULL; // apply
   } else {
     fprintf(stderr, "unknown exp type\n");
     exit(1);
@@ -208,6 +215,21 @@ static int is_tagged(struct exp *exp, const char *s) {
 
 static int is_app(struct exp *exp) {
   return exp->type == PAIR;
+}
+
+static struct exp *car(struct exp *exp) {
+  assert(exp->type == PAIR);
+  return exp->value.pair.car;
+}
+
+static struct exp *cdr(struct exp *exp) {
+  assert(exp->type == PAIR);
+  return exp->value.pair.cdr;
+}
+
+static struct exp *nth(struct exp *exp, int n) {
+  assert(exp->type == PAIR);
+  return n == 0 ? exp->value.pair.car : nth(exp->value.pair.cdr, n - 1);
 }
 
 static void print(struct exp *exp) {
