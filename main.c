@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
 }
 
 enum exp_type {
-  PAIR,
+  PAIR = 1,
   FIXNUM,
   SYMBOL
 };
@@ -155,28 +155,43 @@ static struct exp *make_pair(void) {
   return pair;
 }
 
-static int self_eval_p(struct exp *exp);
-static int var_p(struct exp *exp);
-static int quoted_p(struct exp *exp);
+static int is_self_eval(struct exp *exp);
+static int is_var(struct exp *exp);
+static int is_tagged(struct exp *exp, const char *s);
+static int is_app(struct exp *exp);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
-  if (self_eval_p(exp)) {
+  if (is_self_eval(exp)) {
     return exp;
-  } else if (var_p(exp)) {
+  } else if (is_var(exp)) {
     return NULL; // lookup_var(exp, env);
-  } else if (quoted_p(exp)) {
+  } else if (is_tagged(exp, "quote")) {
     return NULL; // quote_text(exp);
+  } else if (is_tagged(exp, "set!")) {
+    return NULL;
+  } else if (is_tagged(exp, "define")) {
+    return NULL;
+  } else if (is_tagged(exp, "if")) {
+    return NULL;
+  } else if (is_tagged(exp, "lambda")) {
+    return NULL;
+  } else if (is_tagged(exp, "begin")) {
+    return NULL;
+  } else if (is_tagged(exp, "cond")) {
+    return NULL;
+  } else if (is_app(exp)) {
+    return NULL;
   } else {
     fprintf(stderr, "unknown exp type\n");
     exit(1);
   }
 }
 
-static int self_eval_p(struct exp *exp) {
+static int is_self_eval(struct exp *exp) {
   return exp->type == FIXNUM;
 }
 
-static int var_p(struct exp *exp) {
+static int is_var(struct exp *exp) {
   return exp->type == SYMBOL;
 }
 
@@ -184,8 +199,12 @@ static int symbol_eq(struct exp *exp, const char *s) {
   return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
 }
 
-static int quoted_p(struct exp *exp) {
-  return exp->type == PAIR && symbol_eq(exp->value.pair.first, "quote");
+static int is_tagged(struct exp *exp, const char *s) {
+  return exp->type == PAIR && symbol_eq(exp->value.pair.first, s);
+}
+
+static int is_app(struct exp *exp) {
+  return exp->type == PAIR;
 }
 
 static void print(struct exp *exp) {
