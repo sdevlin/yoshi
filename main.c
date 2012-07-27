@@ -12,10 +12,13 @@ static void print(struct exp *exp);
 
 int main(int argc, char **argv) {
   struct exp *e;
-  while ((e = read()) != NULL) {
+  for (;;) {
+    printf("> ");
+    if ((e = read()) == NULL) {
+      return 0;
+    }
     print(eval(e, NULL));
   }
-  return 0;
 }
 
 enum exp_type {
