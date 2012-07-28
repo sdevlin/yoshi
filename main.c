@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <ctype.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -24,7 +25,8 @@ int main(int argc, char **argv) {
 enum exp_type {
   PAIR = 1,
   FIXNUM,
-  SYMBOL
+  SYMBOL,
+  BOOLEAN
 };
 
 struct exp {
@@ -42,13 +44,15 @@ struct exp {
 static struct exp nil;
 #define NIL (&nil)
 
-/*
-static struct exp true;
+static struct exp ok;
+#define OK (&ok)
+
+static struct exp true = { BOOLEAN };
 #define TRUE (&true)
 
-static struct exp false;
+static struct exp false = { BOOLEAN };
 #define FALSE (&false)
-*/
+
 
 static void eat_space(void);
 static struct exp *read_atom(void);
@@ -123,31 +127,37 @@ static struct exp *read_pair(void) {
 }
 
 static struct exp *make_atom(char *buf) {
-  size_t len = strlen(buf);
-  size_t i = buf[0] == '-' ? 1 : 0;
-  struct exp *e = malloc(sizeof *e);
-  e->type = SYMBOL;
-  for (; i < len; i += 1) {
-    if (isdigit(buf[i])) {
-      e->type = FIXNUM;
-    } else {
-      e->type = SYMBOL;
-      break;
+  if (!strcmp(buf, "#t")) {
+    return TRUE;
+  } else if (!strcmp(buf, "#f")) {
+    return FALSE;
+  } else {
+    size_t len = strlen(buf);
+    size_t i = buf[0] == '-' ? 1 : 0;
+    struct exp *e = malloc(sizeof *e);
+    e->type = SYMBOL;
+    for (; i < len; i += 1) {
+      if (isdigit(buf[i])) {
+        e->type = FIXNUM;
+      } else {
+        e->type = SYMBOL;
+        break;
+      }
     }
+    switch (e->type) {
+    case SYMBOL:
+      e->value.symbol = buf;
+      break;
+    case FIXNUM:
+      // not handling overflow
+      e->value.fixnum = strtol(buf, NULL, 10);
+      break;
+    default:
+      fprintf(stderr, "unexpected atom type\n");
+      exit(1);
+    }
+    return e;
   }
-  switch (e->type) {
-  case SYMBOL:
-    e->value.symbol = buf;
-    break;
-  case FIXNUM:
-    // not handling overflow
-    e->value.fixnum = strtol(buf, NULL, 10);
-    break;
-  default:
-    fprintf(stderr, "unexpected atom type\n");
-    exit(1);
-  }
-  return e;
 }
 
 static struct exp *make_pair(void) {
@@ -164,19 +174,24 @@ static int is_tagged(struct exp *exp, const char *s);
 static int is_app(struct exp *exp);
 static struct exp *car(struct exp *exp);
 static struct exp *cdr(struct exp *exp);
-static struct exp *nth(struct exp *exp);
+static struct exp *nth(struct exp *exp, size_t n);
+static void define_var(struct env *env, char *symbol, struct exp *exp);
+static struct exp *lookup_var(struct env *env, char *symbol);
+static void update_var(struct env *env, char *symbol, struct exp *exp);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
     return exp;
   } else if (is_var(exp)) {
-    return NULL; // lookup_var(exp, env);
+    return lookup_var(env, exp->value.symbol);
   } else if (is_tagged(exp, "quote")) {
-    return NULL; // quote_text(exp);
+    return NIL; // quote_text(exp);
   } else if (is_tagged(exp, "set!")) {
-    return NULL; // update_var(nth(exp, 1), eval(nth(exp, 2), env), env);
+    update_var(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
+    return OK;
   } else if (is_tagged(exp, "define")) {
-    return NULL; // define_var(nth(exp, 1), eval(nth(exp, 2), env), env);
+    define_var(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
+    return OK;
   } else if (is_tagged(exp, "if")) {
     if (eval(nth(exp, 1), env) != FALSE) {
       return eval(nth(exp, 2), env);
@@ -184,13 +199,13 @@ static struct exp *eval(struct exp *exp, struct env *env) {
       return eval(nth(exp, 3), env);
     }
   } else if (is_tagged(exp, "lambda")) {
-    return NULL; // make_proc
+    return NIL; // make_proc
   } else if (is_tagged(exp, "begin")) {
-    return NULL; // eval all and return last
+    return NIL; // eval all and return last
   } else if (is_tagged(exp, "cond")) {
-    return NULL; // eval(cond_to_if(exp), env);
+    return NIL; // eval(cond_to_if(exp), env);
   } else if (is_app(exp)) {
-    return NULL; // apply
+    return NIL; // apply
   } else {
     fprintf(stderr, "unknown exp type\n");
     exit(1);
@@ -198,7 +213,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
 }
 
 static int is_self_eval(struct exp *exp) {
-  return exp->type == FIXNUM;
+  return exp->type == FIXNUM || exp->type == BOOLEAN;
 }
 
 static int is_var(struct exp *exp) {
@@ -219,17 +234,29 @@ static int is_app(struct exp *exp) {
 
 static struct exp *car(struct exp *exp) {
   assert(exp->type == PAIR);
-  return exp->value.pair.car;
+  return exp->value.pair.first;
 }
 
 static struct exp *cdr(struct exp *exp) {
   assert(exp->type == PAIR);
-  return exp->value.pair.cdr;
+  return exp->value.pair.rest;
 }
 
-static struct exp *nth(struct exp *exp, int n) {
+static struct exp *nth(struct exp *exp, size_t n) {
   assert(exp->type == PAIR);
-  return n == 0 ? exp->value.pair.car : nth(exp->value.pair.cdr, n - 1);
+  return n == 0 ? car(exp) : nth(cdr(exp), n - 1);
+}
+
+static void define_var(struct env *env, char *symbol, struct exp *exp) {
+
+}
+
+static struct exp *lookup_var(struct env *env, char *symbol) {
+  return NIL;
+}
+
+static void update_var(struct env *env, char *symbol, struct exp *exp) {
+
 }
 
 static void print(struct exp *exp) {
@@ -244,6 +271,15 @@ static void print(struct exp *exp) {
     while (exp != NIL) {
       print(exp->value.pair.first);
       exp = exp->value.pair.rest;
+    }
+    break;
+  case BOOLEAN:
+    if (exp == TRUE) {
+      printf("#t\n");
+    } else if (exp == FALSE) {
+      printf("#f\n");
+    } else {
+      fprintf(stderr, "unexpected boolean\n");
     }
     break;
   default:
