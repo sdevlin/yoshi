@@ -59,7 +59,6 @@ static struct exp true = { BOOLEAN };
 static struct exp false = { BOOLEAN };
 #define FALSE (&false)
 
-
 static void eat_space(void);
 static struct exp *read_atom(void);
 static struct exp *read_pair(void);
