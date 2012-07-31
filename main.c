@@ -175,9 +175,9 @@ static int is_app(struct exp *exp);
 static struct exp *car(struct exp *exp);
 static struct exp *cdr(struct exp *exp);
 static struct exp *nth(struct exp *exp, size_t n);
-static void define_var(struct env *env, char *symbol, struct exp *exp);
+static int define_var(struct env *env, char *symbol, struct exp *exp);
 static struct exp *lookup_var(struct env *env, char *symbol);
-static void update_var(struct env *env, char *symbol, struct exp *exp);
+static int update_var(struct env *env, char *symbol, struct exp *exp);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -185,7 +185,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_var(exp)) {
     return lookup_var(env, exp->value.symbol);
   } else if (is_tagged(exp, "quote")) {
-    return NIL; // quote_text(exp);
+    return nth(exp, 1);
   } else if (is_tagged(exp, "set!")) {
     update_var(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
     return OK;
@@ -247,42 +247,92 @@ static struct exp *nth(struct exp *exp, size_t n) {
   return n == 0 ? car(exp) : nth(cdr(exp), n - 1);
 }
 
-static void define_var(struct env *env, char *symbol, struct exp *exp) {
-
+static int define_var(struct env *env, char *symbol, struct exp *exp) {
+  return 0;
 }
 
 static struct exp *lookup_var(struct env *env, char *symbol) {
   return NIL;
 }
 
-static void update_var(struct env *env, char *symbol, struct exp *exp) {
+static int update_var(struct env *env, char *symbol, struct exp *exp) {
+  return 0;
+}
 
+#define CAT(str)                                \
+  do {                                          \
+    len += strlen(str);                         \
+    while (len + 1 > cap) {                     \
+      cap *= 2;                                 \
+    }                                           \
+    buf = realloc(buf, cap);                    \
+    strcat(buf, str);                           \
+    buf[len] = '\0';                            \
+  } while (0)
+
+static char *stringify(struct exp *exp) {
+  char *buf;
+  size_t len;
+  switch (exp->type) {
+  case SYMBOL:
+    buf = malloc(strlen(exp->value.symbol) + 1);
+    strcpy(buf, exp->value.symbol);
+    return buf;
+  case FIXNUM:
+    len = 0;
+    {
+      long n = exp->value.fixnum;
+      if (n < 0) {
+        len += 1;
+      }
+      while (n != 0) {
+        len += 1;
+        n /= 10;
+      }
+    }
+    buf = malloc(len + 1);
+    sprintf(buf, "%ld", exp->value.fixnum);
+    return buf;
+  case BOOLEAN:
+    if (exp == TRUE) {
+      return "#t";
+    } else if (exp == FALSE) {
+      return "#f";
+    } else {
+      fprintf(stderr, "stringify: bad boolean\n");
+      exit(1);
+    }
+  case PAIR:
+    {
+      size_t cap = 1;
+      buf = malloc(cap);
+      len = 0;
+      buf[len] = '\0';
+      CAT("(");
+      for (;;) {
+        CAT(stringify(exp->value.pair.first));
+        exp = exp->value.pair.rest;
+        if (exp->type == PAIR) {
+          CAT(" ");
+        } else if (exp == NIL) {
+          break;
+        } else {
+          CAT(" . ");
+          CAT(stringify(exp->value.pair.first));
+          break;
+        }
+      }
+      CAT(")");
+      return buf;
+    }
+  default:
+    fprintf(stderr, "stringify: bad exp type: %d\n", exp->type);
+    exit(1);
+  }
 }
 
 static void print(struct exp *exp) {
-  switch (exp->type) {
-  case SYMBOL:
-    printf("%s\n", exp->value.symbol);
-    break;
-  case FIXNUM:
-    printf("%ld\n", exp->value.fixnum);
-    break;
-  case PAIR:
-    while (exp != NIL) {
-      print(exp->value.pair.first);
-      exp = exp->value.pair.rest;
-    }
-    break;
-  case BOOLEAN:
-    if (exp == TRUE) {
-      printf("#t\n");
-    } else if (exp == FALSE) {
-      printf("#f\n");
-    } else {
-      fprintf(stderr, "unexpected boolean\n");
-    }
-    break;
-  default:
-    fprintf(stderr, "unexpected exp type: %d\n", exp->type);
-  }
+  char *str = stringify(exp);
+  printf("%s\n", str);
+  free(str);
 }
