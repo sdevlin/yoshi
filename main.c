@@ -300,14 +300,16 @@ static char *stringify(struct exp *exp) {
     sprintf(buf, "%ld", exp->value.fixnum);
     return buf;
   case BOOLEAN:
+    buf = malloc(3);
     if (exp == TRUE) {
-      return "#t";
+      strcpy(buf, "#t");
     } else if (exp == FALSE) {
-      return "#f";
+      strcpy(buf, "#f");
     } else {
       fprintf(stderr, "stringify: bad boolean\n");
       exit(1);
     }
+    return buf;
   case PAIR:
     {
       size_t cap = 1;
@@ -336,6 +338,8 @@ static char *stringify(struct exp *exp) {
     exit(1);
   }
 }
+
+#undef CAT
 
 static void print(struct exp *exp) {
   char *str = stringify(exp);
