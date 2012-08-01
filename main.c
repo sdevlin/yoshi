@@ -274,36 +274,39 @@ static struct exp *env_define(struct env *env, char *symbol,
   return OK;
 }
 
-static struct exp *env_lookup(struct env *env, char *symbol) {
+static struct exp *env_visit(struct env *env, char *symbol, struct exp *value,
+                             struct exp *(*visit)(struct binding *b,
+                                                  struct exp *v)) {
   do {
     struct binding *b = env->bindings;
     while (b != NULL) {
       if (!strcmp(b->symbol, symbol)) {
-        return b->value;
+        return (*visit)(b, value);
       }
       b = b->next;
     }
     env = env->parent;
   } while (env);
-  fprintf(stderr, "env_lookup: no binding for %s\n", symbol);
+  fprintf(stderr, "env_visit: no binding for %s\n", symbol);
   exit(1);
+}
+
+static struct exp *binding_lookup(struct binding *binding, struct exp *_) {
+  return binding->value;
+}
+
+static struct exp *env_lookup(struct env *env, char *symbol) {
+  return env_visit(env, symbol, NULL, &binding_lookup);
+}
+
+static struct exp *binding_update(struct binding *binding, struct exp *value) {
+  binding->value = value;
+  return OK;
 }
 
 static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value) {
-  do {
-    struct binding *b = env->bindings;
-    while (b != NULL) {
-      if (!strcmp(b->symbol, symbol)) {
-        b->value = value;
-        return OK;
-      }
-      b = b->next;
-    }
-    env = env->parent;
-  } while (env);
-  fprintf(stderr, "env_update: no binding for %s\n", symbol);
-  exit(1);
+  return env_visit(env, symbol, value, &binding_update);
 }
 
 #define CAT(str)                                \
