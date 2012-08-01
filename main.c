@@ -13,6 +13,8 @@
 struct exp;
 struct env;
 
+static struct env global_env;
+
 static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
@@ -24,7 +26,7 @@ int main(int argc, char **argv) {
     if ((e = read()) == NULL) {
       return 0;
     }
-    print(eval(e, NULL));
+    print(eval(e, &global_env));
   }
 }
 
@@ -32,7 +34,8 @@ enum exp_type {
   PAIR = 1,
   FIXNUM,
   SYMBOL,
-  BOOLEAN
+  BOOLEAN,
+  SPECIAL
 };
 
 struct exp {
@@ -180,9 +183,9 @@ static int is_app(struct exp *exp);
 static struct exp *car(struct exp *exp);
 static struct exp *cdr(struct exp *exp);
 static struct exp *nth(struct exp *exp, size_t n);
-static int define_var(struct env *env, char *symbol, struct exp *exp);
+static void define_var(struct env *env, char *symbol, struct exp *value);
 static struct exp *lookup_var(struct env *env, char *symbol);
-static int update_var(struct env *env, char *symbol, struct exp *exp);
+static void update_var(struct env *env, char *symbol, struct exp *value);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -252,16 +255,52 @@ static struct exp *nth(struct exp *exp, size_t n) {
   return n == 0 ? car(exp) : nth(cdr(exp), n - 1);
 }
 
-static int define_var(struct env *env, char *symbol, struct exp *exp) {
-  return 0;
+struct env {
+  struct binding {
+    char *symbol;
+    struct exp *value;
+    struct binding *next;
+  } *bindings;
+  struct env *parent;
+};
+
+static void define_var(struct env *env, char *symbol, struct exp *value) {
+  struct binding *b = malloc(sizeof *b);
+  b->symbol = symbol;
+  b->value = value;
+  b->next = env->bindings;
+  env->bindings = b;
 }
 
 static struct exp *lookup_var(struct env *env, char *symbol) {
-  return NIL;
+  do {
+    struct binding *b = env->bindings;
+    while (b != NULL) {
+      if (!strcmp(b->symbol, symbol)) {
+        return b->value;
+      }
+      b = b->next;
+    }
+    env = env->parent;
+  } while (env);
+  fprintf(stderr, "lookup_var: no binding for %s\n", symbol);
+  exit(1);
 }
 
-static int update_var(struct env *env, char *symbol, struct exp *exp) {
-  return 0;
+static void update_var(struct env *env, char *symbol, struct exp *value) {
+  do {
+    struct binding *b = env->bindings;
+    while (b != NULL) {
+      if (!strcmp(b->symbol, symbol)) {
+        b->value = value;
+        return;
+      }
+      b = b->next;
+    }
+    env = env->parent;
+  } while (env);
+  fprintf(stderr, "update_var: no binding for %s\n", symbol);
+  exit(1);
 }
 
 #define CAT(str)                                \
@@ -341,7 +380,11 @@ static char *stringify(struct exp *exp) {
 #undef CAT
 
 static void print(struct exp *exp) {
-  char *str = stringify(exp);
-  printf("%s\n", str);
-  free(str);
+  if (exp == OK) {
+    return;
+  } else {
+    char *str = stringify(exp);
+    printf("%s\n", str);
+    free(str);
+  }
 }
