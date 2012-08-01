@@ -183,23 +183,23 @@ static int is_app(struct exp *exp);
 static struct exp *car(struct exp *exp);
 static struct exp *cdr(struct exp *exp);
 static struct exp *nth(struct exp *exp, size_t n);
-static struct exp *var_define(struct env *env, char *symbol,
+static struct exp *env_define(struct env *env, char *symbol,
                               struct exp *value);
-static struct exp *var_lookup(struct env *env, char *symbol);
-static struct exp *var_update(struct env *env, char *symbol,
+static struct exp *env_lookup(struct env *env, char *symbol);
+static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
     return exp;
   } else if (is_var(exp)) {
-    return var_lookup(env, exp->value.symbol);
+    return env_lookup(env, exp->value.symbol);
   } else if (is_tagged(exp, "quote")) {
     return nth(exp, 1);
   } else if (is_tagged(exp, "set!")) {
-    return var_update(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
+    return env_update(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
   } else if (is_tagged(exp, "define")) {
-    return var_define(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
+    return env_define(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
   } else if (is_tagged(exp, "if")) {
     if (eval(nth(exp, 1), env) != FALSE) {
       return eval(nth(exp, 2), env);
@@ -264,7 +264,7 @@ struct env {
   struct env *parent;
 };
 
-static struct exp *var_define(struct env *env, char *symbol,
+static struct exp *env_define(struct env *env, char *symbol,
                               struct exp *value) {
   struct binding *b = malloc(sizeof *b);
   b->symbol = symbol;
@@ -274,7 +274,7 @@ static struct exp *var_define(struct env *env, char *symbol,
   return OK;
 }
 
-static struct exp *var_lookup(struct env *env, char *symbol) {
+static struct exp *env_lookup(struct env *env, char *symbol) {
   do {
     struct binding *b = env->bindings;
     while (b != NULL) {
@@ -285,11 +285,11 @@ static struct exp *var_lookup(struct env *env, char *symbol) {
     }
     env = env->parent;
   } while (env);
-  fprintf(stderr, "lookup_var: no binding for %s\n", symbol);
+  fprintf(stderr, "env_lookup: no binding for %s\n", symbol);
   exit(1);
 }
 
-static struct exp *var_update(struct env *env, char *symbol,
+static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value) {
   do {
     struct binding *b = env->bindings;
@@ -302,7 +302,7 @@ static struct exp *var_update(struct env *env, char *symbol,
     }
     env = env->parent;
   } while (env);
-  fprintf(stderr, "update_var: no binding for %s\n", symbol);
+  fprintf(stderr, "env_update: no binding for %s\n", symbol);
   exit(1);
 }
 
