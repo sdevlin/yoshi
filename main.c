@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -178,6 +179,7 @@ static struct exp *make_pair(void) {
 
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
+static int symbol_eq(struct exp *exp, const char *s);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
 static struct exp *car(struct exp *exp);
@@ -188,7 +190,8 @@ static struct exp *env_define(struct env *env, char *symbol,
 static struct exp *env_lookup(struct env *env, char *symbol);
 static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value);
-static struct exp *eval_begin(struct exp *forms, struct env *env);
+static struct exp *eval_begin(struct exp *begin, struct env *env);
+static struct exp *cond_to_if(struct exp *cond);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -210,9 +213,9 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_tagged(exp, "lambda")) {
     return NIL; // make_proc
   } else if (is_tagged(exp, "begin")) {
-    return eval_begin(cdr(exp), env); // eval all and return last
+    return eval_begin(cdr(exp), env);
   } else if (is_tagged(exp, "cond")) {
-    return NIL; // eval(cond_to_if(exp), env);
+    return eval(cond_to_if(cdr(exp)), env);
   } else if (is_apply(exp)) {
     return NIL; // apply
   } else {
@@ -229,6 +232,43 @@ static struct exp *eval_begin(struct exp *forms, struct env *env) {
     forms = cdr(forms);
   }
   return result;
+}
+
+static struct exp *make_list(struct exp *first, ...) {
+  struct exp *list;
+  struct exp *node;
+  va_list args;
+  assert(first != NULL);
+  list = node = make_pair();
+  node->value.pair.first = first;
+  va_start(args, first);
+  for (;;) {
+    struct exp *next = va_arg(args, struct exp *);
+    assert(next != NULL);
+    if (next == NIL) {
+      node->value.pair.rest = next;
+      break;
+    } else {
+      node->value.pair.rest = make_pair();
+      node = node->value.pair.rest;
+      node->value.pair.first = next;
+    }
+  }
+  va_end(args);
+  return list;
+}
+
+static struct exp *cond_to_if(struct exp *conds) {
+  if (conds == NIL) {
+    return OK;
+  } else {
+    struct exp *pred = car(car(conds));
+    return make_list(make_atom("if"),
+                     symbol_eq(pred, "else") ? TRUE : pred,
+                     nth(car(conds), 1),
+                     cond_to_if(cdr(conds)),
+                     NIL);
+  }
 }
 
 static int is_self_eval(struct exp *exp) {
