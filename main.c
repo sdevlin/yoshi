@@ -179,7 +179,7 @@ static struct exp *make_pair(void) {
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
-static int is_app(struct exp *exp);
+static int is_apply(struct exp *exp);
 static struct exp *car(struct exp *exp);
 static struct exp *cdr(struct exp *exp);
 static struct exp *nth(struct exp *exp, size_t n);
@@ -188,6 +188,7 @@ static struct exp *env_define(struct env *env, char *symbol,
 static struct exp *env_lookup(struct env *env, char *symbol);
 static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value);
+static struct exp *eval_begin(struct exp *forms, struct env *env);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -209,15 +210,25 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_tagged(exp, "lambda")) {
     return NIL; // make_proc
   } else if (is_tagged(exp, "begin")) {
-    return NIL; // eval all and return last
+    return eval_begin(cdr(exp), env); // eval all and return last
   } else if (is_tagged(exp, "cond")) {
     return NIL; // eval(cond_to_if(exp), env);
-  } else if (is_app(exp)) {
+  } else if (is_apply(exp)) {
     return NIL; // apply
   } else {
     fprintf(stderr, "unknown exp type\n");
     exit(1);
   }
+}
+
+static struct exp *eval_begin(struct exp *forms, struct env *env) {
+  struct exp *result;
+  assert(forms != NIL);
+  while (forms != NIL) {
+    result = eval(car(forms), env);
+    forms = cdr(forms);
+  }
+  return result;
 }
 
 static int is_self_eval(struct exp *exp) {
@@ -236,7 +247,7 @@ static int is_tagged(struct exp *exp, const char *s) {
   return exp->type == PAIR && symbol_eq(exp->value.pair.first, s);
 }
 
-static int is_app(struct exp *exp) {
+static int is_apply(struct exp *exp) {
   return exp->type == PAIR;
 }
 
