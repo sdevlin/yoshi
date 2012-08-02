@@ -32,11 +32,12 @@ int main(int argc, char **argv) {
 }
 
 enum exp_type {
-  PAIR = 1,
+  UNDEFINED,
+  PAIR,
   FIXNUM,
   SYMBOL,
-  BOOLEAN,
-  SPECIAL
+  CLOSURE,
+  CONSTANT
 };
 
 struct exp {
@@ -48,19 +49,24 @@ struct exp {
     } pair;
     long fixnum;
     char *symbol;
+    struct {
+      struct exp *params;
+      struct exp *body;
+      struct env *env;
+    } closure;
   } value;
 };
 
-static struct exp nil;
+static struct exp nil = { CONSTANT };
 #define NIL (&nil)
 
-static struct exp ok;
+static struct exp ok = { UNDEFINED };
 #define OK (&ok)
 
-static struct exp true = { BOOLEAN };
+static struct exp true = { CONSTANT };
 #define TRUE (&true)
 
-static struct exp false = { BOOLEAN };
+static struct exp false = { CONSTANT };
 #define FALSE (&false)
 
 static void eat_space(void);
@@ -192,6 +198,8 @@ static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value);
 static struct exp *eval_begin(struct exp *begin, struct env *env);
 static struct exp *cond_to_if(struct exp *cond);
+static struct exp *make_closure(struct exp *params, struct exp *body,
+                                struct env *env);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -211,7 +219,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
       return eval(nth(exp, 3), env);
     }
   } else if (is_tagged(exp, "lambda")) {
-    return NIL; // make_proc
+    return make_closure(nth(exp, 1), cdr(cdr(exp)), env);
   } else if (is_tagged(exp, "begin")) {
     return eval_begin(cdr(exp), env);
   } else if (is_tagged(exp, "cond")) {
@@ -271,8 +279,18 @@ static struct exp *cond_to_if(struct exp *conds) {
   }
 }
 
+static struct exp *make_closure(struct exp *params, struct exp *body,
+                                struct env *env) {
+  struct exp *e = malloc(sizeof *e);
+  e->type = CLOSURE;
+  e->value.closure.params = params;
+  e->value.closure.body = body;
+  e->value.closure.env = env;
+  return e;
+}
+
 static int is_self_eval(struct exp *exp) {
-  return exp->type == FIXNUM || exp->type == BOOLEAN;
+  return exp->type == FIXNUM || exp->type == CONSTANT;
 }
 
 static int is_var(struct exp *exp) {
@@ -394,14 +412,16 @@ static char *stringify(struct exp *exp) {
     buf = malloc(len + 1);
     sprintf(buf, "%ld", exp->value.fixnum);
     return buf;
-  case BOOLEAN:
+  case CONSTANT:
     buf = malloc(3);
     if (exp == TRUE) {
       strcpy(buf, "#t");
     } else if (exp == FALSE) {
       strcpy(buf, "#f");
+    } else if (exp == NIL) {
+      strcpy(buf, "()");
     } else {
-      fprintf(stderr, "stringify: bad boolean\n");
+      fprintf(stderr, "stringify: bad constant\n");
       exit(1);
     }
     return buf;
@@ -428,6 +448,10 @@ static char *stringify(struct exp *exp) {
       CAT(")");
       return buf;
     }
+  case CLOSURE:
+    buf = malloc(12);
+    sprintf(buf, "%s", "<# closure>");
+    return buf;
   default:
     fprintf(stderr, "stringify: bad exp type: %d\n", exp->type);
     exit(1);
@@ -437,11 +461,15 @@ static char *stringify(struct exp *exp) {
 #undef CAT
 
 static void print(struct exp *exp) {
-  if (exp == OK) {
-    return;
-  } else {
-    char *str = stringify(exp);
-    printf("%s\n", str);
-    free(str);
+  switch (exp->type) {
+  case UNDEFINED:
+    break;
+  default:
+    {
+      char *str = stringify(exp);
+      printf("%s\n", str);
+      free(str);
+    }
+    break;
   }
 }
