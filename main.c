@@ -6,6 +6,7 @@
 #include <string.h>
 
 // TODO: remove all asserts for things that aren't compile-time checks
+// hint: this is all of them
 
 struct exp;
 struct env;
