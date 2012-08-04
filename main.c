@@ -527,11 +527,11 @@ static char *stringify(struct exp *exp) {
     }
   case FUNCTION:
     buf = malloc(13);
-    sprintf(buf, "%s", "<# function>");
+    sprintf(buf, "%s", "#<function>");
     return buf;
   case CLOSURE:
     buf = malloc(12);
-    sprintf(buf, "%s", "<# closure>");
+    sprintf(buf, "%s", "#<closure>");
     return buf;
   default:
     fprintf(stderr, "stringify: bad exp type: %d\n", exp->type);
