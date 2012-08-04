@@ -214,7 +214,6 @@ static struct env *extend_env(struct exp *params, struct exp *args,
 static struct exp *map_list(struct exp *list, struct env *env,
                             struct exp *(*fn)(struct exp *exp,
                                               struct env *env));
-static struct exp *lookup_if_sym(struct exp *exp, struct env *env);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -241,7 +240,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
     return eval(cond_to_if(cdr(exp)), env);
   } else if (is_apply(exp)) {
     struct exp *fn = eval(car(exp), env);
-    struct exp *args = map_list(cdr(exp), env, &lookup_if_sym);
+    struct exp *args = map_list(cdr(exp), env, &eval);
     return apply(fn, args, env);
   } else {
     fprintf(stderr, "unknown exp type\n");
@@ -291,15 +290,6 @@ static struct exp *map_list(struct exp *list, struct env *env,
     new_list->value.pair.first = (*fn)(car(list), env);
     new_list->value.pair.rest = map_list(cdr(list), env, fn);
     return new_list;
-  }
-}
-
-static struct exp *lookup_if_sym(struct exp *exp, struct env *env) {
-  switch (exp->type) {
-  case SYMBOL:
-    return env_lookup(env, exp->value.symbol);
-  default:
-    return exp;
   }
 }
 
