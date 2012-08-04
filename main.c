@@ -1,12 +1,10 @@
 #include <assert.h>
 #include <ctype.h>
+#include <setjmp.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-// TODO: remove all asserts for things that aren't compile-time checks
-// hint: this is all of them
 
 struct exp;
 struct env;
@@ -18,16 +16,35 @@ static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
 
+static jmp_buf env_buf;
+static const char *err_msg;
+
 int main(int argc, char **argv) {
   define_primitives(&global_env);
   for (;;) {
     struct exp *e;
     printf("yoshi> ");
-    if ((e = read()) == NULL) {
-      return 0;
+    if (!setjmp(env_buf)) {
+      if ((e = read()) == NULL) {
+        return 0;
+      }
+      print(eval(e, &global_env));
+    } else {
+      printf("error: %s\n", err_msg);
     }
-    print(eval(e, &global_env));
   }
+}
+
+static void *ensure(int exp, const char *msg) {
+  if (!exp) {
+    err_msg = msg;
+    longjmp(env_buf, 1);
+  }
+  return NULL;
+}
+
+static void *error(const char *msg) {
+  return ensure(0, msg);
 }
 
 enum exp_type {
@@ -84,8 +101,7 @@ static struct exp *read(void) {
   case '(':
     return read_pair();
   case ')':
-    fprintf(stderr, "bad input\n");
-    exit(1);
+    error("bad input");
   default:
     ungetc(c, stdin);
     return read_atom();
@@ -177,8 +193,8 @@ static struct exp *make_atom(char *buf) {
       e->value.fixnum = strtol(buf, NULL, 10);
       break;
     default:
-      fprintf(stderr, "unexpected atom type\n");
-      exit(1);
+      error("unexpected atom type");
+      break;
     }
     return e;
   }
@@ -244,8 +260,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
     struct exp *args = map_list(cdr(exp), env, &eval);
     return apply(fn, args, env);
   } else {
-    fprintf(stderr, "unknown exp type\n");
-    exit(1);
+    return error("unknown exp type");
   }
 }
 
@@ -266,14 +281,12 @@ static struct exp *apply(struct exp *fn, struct exp *args, struct env *env) {
       return result;
     }
   default:
-    fprintf(stderr, "apply: bad type: %d\n", fn->type);
-    exit(1);
+    return error("apply: bad function type");
   }
 }
 
 size_t list_length(struct exp *list) {
   size_t len = 0;
-  assert(list->type == PAIR || list == NIL);
   while (list != NIL) {
     list = cdr(list);
     len += 1;
@@ -296,7 +309,6 @@ static struct exp *map_list(struct exp *list, struct env *env,
 
 static struct exp *eval_begin(struct exp *forms, struct env *env) {
   struct exp *result;
-  assert(forms != NIL);
   while (forms != NIL) {
     result = eval(car(forms), env);
     forms = cdr(forms);
@@ -372,17 +384,14 @@ static int is_apply(struct exp *exp) {
 }
 
 static struct exp *car(struct exp *exp) {
-  assert(exp->type == PAIR);
   return exp->value.pair.first;
 }
 
 static struct exp *cdr(struct exp *exp) {
-  assert(exp->type == PAIR);
   return exp->value.pair.rest;
 }
 
 static struct exp *nth(struct exp *exp, size_t n) {
-  assert(exp->type == PAIR);
   return n == 0 ? car(exp) : nth(cdr(exp), n - 1);
 }
 
@@ -418,8 +427,7 @@ static struct exp *env_visit(struct env *env, char *symbol, struct exp *value,
     }
     env = env->parent;
   } while (env);
-  fprintf(stderr, "env_visit: no binding for %s\n", symbol);
-  exit(1);
+  return error("env_visit: no binding for symbol");
 }
 
 static struct exp *binding_lookup(struct binding *binding, struct exp *_) {
@@ -444,12 +452,13 @@ static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent) {
   struct env *env = malloc(sizeof *env);
   env->parent = parent;
-  assert(list_length(params) == list_length(args));
+  ensure(list_length(params) == list_length(args),
+         "wrong number of args in application");
   while (params != NIL) {
-    assert(params->type == PAIR);
-    assert(car(params)->type == SYMBOL);
-    assert(args->type == PAIR);
-    env_define(env, car(params)->value.symbol, car(args));
+    // ignore non-symbol params
+    if (car(params)->type == SYMBOL) {
+      env_define(env, car(params)->value.symbol, car(args));
+    }
     params = cdr(params);
     args = cdr(args);
   }
@@ -499,8 +508,7 @@ static char *stringify(struct exp *exp) {
     } else if (exp == NIL) {
       strcpy(buf, "()");
     } else {
-      fprintf(stderr, "stringify: bad constant\n");
-      exit(1);
+      error("stringify: bad constant");
     }
     return buf;
   case PAIR:
@@ -535,8 +543,7 @@ static char *stringify(struct exp *exp) {
     sprintf(buf, "%s", "#<closure>");
     return buf;
   default:
-    fprintf(stderr, "stringify: bad exp type: %d\n", exp->type);
-    exit(1);
+    return error("stringify: bad exp type");
   }
 }
 
@@ -558,12 +565,12 @@ static void print(struct exp *exp) {
 
 struct exp *fn_eq(struct exp *args) {
   size_t len = list_length(args);
-  assert(len >= 2);
+  ensure(len >= 2, "= requires at least two arguments");
   struct exp *first = car(args);
-  assert(first->type == FIXNUM);
+  ensure(first->type == FIXNUM, "= requires numeric arguments");
   args = cdr(args);
   while (args != NIL) {
-    assert(car(args)->type == FIXNUM);
+    ensure(car(args)->type == FIXNUM, "= requires numeric arguments");
     if (first->value.fixnum != car(args)->value.fixnum) {
       return FALSE;
     }
@@ -574,11 +581,10 @@ struct exp *fn_eq(struct exp *args) {
 
 struct exp *fn_add(struct exp *args) {
   long acc = 0;
-  assert(list_length(args) > 0);
+  ensure(list_length(args) > 0, "+ requires at least one argument");
   while (args != NIL) {
-    assert(args->type == PAIR);
     struct exp *e = car(args);
-    assert(e->type == FIXNUM);
+    ensure(e->type == FIXNUM, "+ requires numeric arguments");
     acc += e->value.fixnum;
     args = cdr(args);
   }
@@ -587,15 +593,15 @@ struct exp *fn_add(struct exp *args) {
 
 struct exp *fn_sub(struct exp *args) {
   size_t len = list_length(args);
-  assert(len > 0);
-  assert(car(args)->type == FIXNUM);
+  ensure(len > 0, "- requires at least one argument");
+  ensure(car(args)->type == FIXNUM, "- requires numeric arguments");
   long acc = car(args)->value.fixnum;
   args = cdr(args);
   if (len == 1) {
     acc *= -1;
   } else {
     while (args != NIL) {
-      assert(car(args)->type == FIXNUM);
+      ensure(car(args)->type == FIXNUM, "- requires numeric arguments");
       acc -= car(args)->value.fixnum;
       args = cdr(args);
     }
@@ -605,11 +611,10 @@ struct exp *fn_sub(struct exp *args) {
 
 struct exp *fn_mul(struct exp *args) {
   long acc = 1;
-  assert(list_length(args) > 0);
+  ensure(list_length(args) > 0, "* requires at least one argument");
   while (args != NIL) {
-    assert(args->type == PAIR);
     struct exp *e = car(args);
-    assert(e->type == FIXNUM);
+    ensure(e->type == FIXNUM, "* requires numeric arguments");
     acc *= e->value.fixnum;
     args = cdr(args);
   }
