@@ -1,9 +1,3 @@
-/*
- * This is a LISP interpreter written in C.
- * It leaks memory like a sieve. Deal with it.
- * RIP John McCarthy and Dennis Ritchie.
- */
-
 #include <assert.h>
 #include <ctype.h>
 #include <stdarg.h>

@@ -1,0 +1,9 @@
+This is a LISP-1 interpreter written in C. The syntax and semantics are actually more like Scheme.
+
+The eval/apply definitions are based on SICP 4.1.
+
+This program leaks memory like a sieve. Deal with it.
+
+Actually, this is mostly because I was too lazy to write a garbage collector for it. Maybe I'll get around to it.
+
+RIP Dennis Ritchie and John McCarthy.
