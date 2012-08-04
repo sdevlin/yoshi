@@ -1,4 +1,4 @@
-This is yoshi, a LISP-1 interpreter written in C. (The syntax and semantics are actually more like Scheme.)
+This is yoshi, a LISP-1 interpreter written in C. (The syntax and semantics are Scheme-like.)
 
 I wanted to keep things all in one file for simplicity. It might be a little disorganized as a result. I hope it's not too tough to follow.
 
