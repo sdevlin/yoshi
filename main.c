@@ -555,6 +555,22 @@ static void print(struct exp *exp) {
   }
 }
 
+struct exp *fn_eq(struct exp *args) {
+  size_t len = list_length(args);
+  assert(len >= 2);
+  struct exp *first = car(args);
+  assert(first->type == FIXNUM);
+  args = cdr(args);
+  while (args != NIL) {
+    assert(car(args)->type == FIXNUM);
+    if (first->value.fixnum != car(args)->value.fixnum) {
+      return FALSE;
+    }
+    args = cdr(args);
+  }
+  return TRUE;
+}
+
 struct exp *fn_add(struct exp *args) {
   long acc = 0;
   assert(list_length(args) > 0);
@@ -586,6 +602,19 @@ struct exp *fn_sub(struct exp *args) {
   return make_fixnum(acc);
 }
 
+struct exp *fn_mul(struct exp *args) {
+  long acc = 1;
+  assert(list_length(args) > 0);
+  while (args != NIL) {
+    assert(args->type == PAIR);
+    struct exp *e = car(args);
+    assert(e->type == FIXNUM);
+    acc *= e->value.fixnum;
+    args = cdr(args);
+  }
+  return make_fixnum(acc);
+}
+
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = malloc(sizeof *e);
@@ -596,7 +625,9 @@ static void define_primitive(struct env *env, char *symbol,
 
 static void define_primitives(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
+  DEFUN("=", fn_eq);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
+  DEFUN("*", fn_mul);
 #undef DEFUN
 }
