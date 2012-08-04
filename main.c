@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
   define_primitives(&global_env);
   for (;;) {
     struct exp *e;
-    printf("lisp> ");
+    printf("yoshi> ");
     if ((e = read()) == NULL) {
       return 0;
     }

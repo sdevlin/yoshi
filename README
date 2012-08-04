@@ -1,4 +1,6 @@
-This is a LISP-1 interpreter written in C. The syntax and semantics are actually more like Scheme.
+This is yoshi, a LISP-1 interpreter written in C. (The syntax and semantics are actually more like Scheme.)
+
+The name is from Mario games, but this is apropos of nothing.
 
 The eval/apply definitions are based on SICP 4.1.
 

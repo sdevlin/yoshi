@@ -3,16 +3,16 @@ FLAGS = -g -o $@
 CFLAGS = -c -Wall -Werror -pedantic -std=c99 $(FLAGS)
 LDFLAGS = $(FLAGS)
 
-all : lisp
+all : yoshi
 
-lisp : main.o
+yoshi : main.o
 	$(CC) $(LDFLAGS) main.o
 
 main.o : main.c
 	$(CC) $(CFLAGS) main.c
 
 clobber : clean
-	rm -f lisp || true
+	rm -f yoshi || true
 
 clean :
 	rm -f *.o || true
