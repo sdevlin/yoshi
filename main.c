@@ -11,18 +11,22 @@
 #include <stdio.h>
 #include <string.h>
 
+// TODO: remove all asserts for things that aren't compile-time checks
+
 struct exp;
 struct env;
 
 static struct env global_env;
+static void define_primitives(struct env *env);
 
 static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
 
 int main(int argc, char **argv) {
-  struct exp *e;
+  define_primitives(&global_env);
   for (;;) {
+    struct exp *e;
     printf("lisp> ");
     if ((e = read()) == NULL) {
       return 0;
@@ -37,6 +41,7 @@ enum exp_type {
   FIXNUM,
   SYMBOL,
   CLOSURE,
+  FUNCTION,
   CONSTANT
 };
 
@@ -49,6 +54,7 @@ struct exp {
     } pair;
     long fixnum;
     char *symbol;
+    struct exp *(*function)(struct exp *args);
     struct {
       struct exp *params;
       struct exp *body;
@@ -141,6 +147,14 @@ static struct exp *read_pair(void) {
   }
 }
 
+// refactor make_atom to use this
+static struct exp *make_fixnum(long fixnum) {
+  struct exp *e = malloc(sizeof *e);
+  e->type = FIXNUM;
+  e->value.fixnum = fixnum;
+  return e;
+}
+
 static struct exp *make_atom(char *buf) {
   if (!strcmp(buf, "#t")) {
     return TRUE;
@@ -200,6 +214,13 @@ static struct exp *eval_begin(struct exp *begin, struct env *env);
 static struct exp *cond_to_if(struct exp *cond);
 static struct exp *make_closure(struct exp *params, struct exp *body,
                                 struct env *env);
+static struct exp *apply(struct exp *fn, struct exp *args, struct env *env);
+static struct env *extend_env(struct exp *params, struct exp *args,
+                              struct env *parent);
+static struct exp *map_list(struct exp *list, struct env *env,
+                            struct exp *(*fn)(struct exp *exp,
+                                              struct env *env));
+static struct exp *lookup_if_sym(struct exp *exp, struct env *env);
 
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
@@ -225,10 +246,66 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_tagged(exp, "cond")) {
     return eval(cond_to_if(cdr(exp)), env);
   } else if (is_apply(exp)) {
-    return NIL; // apply
+    struct exp *fn = eval(car(exp), env);
+    struct exp *args = map_list(cdr(exp), env, &lookup_if_sym);
+    return apply(fn, args, env);
   } else {
     fprintf(stderr, "unknown exp type\n");
     exit(1);
+  }
+}
+
+static struct exp *apply(struct exp *fn, struct exp *args, struct env *env) {
+  switch (fn->type) {
+  case FUNCTION:
+    return fn->value.function(args);
+  case CLOSURE:
+    {
+      struct env *new_env = extend_env(fn->value.closure.params, args,
+                                       fn->value.closure.env);
+      struct exp *exp = fn->value.closure.body;
+      struct exp *result;
+      while (exp != NIL) {
+        result = eval(car(exp), new_env);
+        exp = cdr(exp);
+      }
+      return result;
+    }
+  default:
+    fprintf(stderr, "apply: bad type: %d\n", fn->type);
+    exit(1);
+  }
+}
+
+size_t list_length(struct exp *list) {
+  size_t len = 0;
+  assert(list->type == PAIR || list == NIL);
+  while (list != NIL) {
+    list = cdr(list);
+    len += 1;
+  }
+  return len;
+}
+
+static struct exp *map_list(struct exp *list, struct env *env,
+                            struct exp *(*fn)(struct exp *exp,
+                                              struct env *env)) {
+  if (list == NIL) {
+    return NIL;
+  } else {
+    struct exp *new_list = make_pair();
+    new_list->value.pair.first = (*fn)(car(list), env);
+    new_list->value.pair.rest = map_list(cdr(list), env, fn);
+    return new_list;
+  }
+}
+
+static struct exp *lookup_if_sym(struct exp *exp, struct env *env) {
+  switch (exp->type) {
+  case SYMBOL:
+    return env_lookup(env, exp->value.symbol);
+  default:
+    return exp;
   }
 }
 
@@ -378,6 +455,22 @@ static struct exp *env_update(struct env *env, char *symbol,
   return env_visit(env, symbol, value, &binding_update);
 }
 
+static struct env *extend_env(struct exp *params, struct exp *args,
+                              struct env *parent) {
+  struct env *env = malloc(sizeof *env);
+  env->parent = parent;
+  assert(list_length(params) == list_length(args));
+  while (params != NIL) {
+    assert(params->type == PAIR);
+    assert(car(params)->type == SYMBOL);
+    assert(args->type == PAIR);
+    env_define(env, car(params)->value.symbol, car(args));
+    params = cdr(params);
+    args = cdr(args);
+  }
+  return env;
+}
+
 #define CAT(str)                                \
   do {                                          \
     len += strlen(str);                         \
@@ -448,6 +541,10 @@ static char *stringify(struct exp *exp) {
       CAT(")");
       return buf;
     }
+  case FUNCTION:
+    buf = malloc(13);
+    sprintf(buf, "%s", "<# function>");
+    return buf;
   case CLOSURE:
     buf = malloc(12);
     sprintf(buf, "%s", "<# closure>");
@@ -472,4 +569,50 @@ static void print(struct exp *exp) {
     }
     break;
   }
+}
+
+struct exp *fn_add(struct exp *args) {
+  long acc = 0;
+  assert(list_length(args) > 0);
+  while (args != NIL) {
+    assert(args->type == PAIR);
+    struct exp *e = car(args);
+    assert(e->type == FIXNUM);
+    acc += e->value.fixnum;
+    args = cdr(args);
+  }
+  return make_fixnum(acc);
+}
+
+struct exp *fn_sub(struct exp *args) {
+  size_t len = list_length(args);
+  assert(len > 0);
+  assert(car(args)->type == FIXNUM);
+  long acc = car(args)->value.fixnum;
+  args = cdr(args);
+  if (len == 1) {
+    acc *= -1;
+  } else {
+    while (args != NIL) {
+      assert(car(args)->type == FIXNUM);
+      acc -= car(args)->value.fixnum;
+      args = cdr(args);
+    }
+  }
+  return make_fixnum(acc);
+}
+
+static void define_primitive(struct env *env, char *symbol,
+                             struct exp *(*function)(struct exp *args)) {
+  struct exp *e = malloc(sizeof *e);
+  e->type = FUNCTION;
+  e->value.function = function;
+  env_define(env, symbol, e);
+}
+
+static void define_primitives(struct env *env) {
+#define DEFUN(sym, fn) define_primitive(env, sym, &fn)
+  DEFUN("+", fn_add);
+  DEFUN("-", fn_sub);
+#undef DEFUN
 }
