@@ -2,6 +2,8 @@ This is yoshi, a LISP-1 interpreter written in C. (The syntax and semantics are 
 
 The name is from Mario games, but this is apropos of nothing.
 
+I wanted to keep things all in one file for simplicity. It might be a little disorganized as a result. I hope it's not too tough to follow.
+
 The eval/apply definitions are based on SICP 4.1.
 
 This program leaks memory like a sieve. Deal with it.
