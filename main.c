@@ -641,7 +641,8 @@ static void define_primitives(struct env *env) {
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
-  // DEFUN("/", fn_div);
+  // DEFUN("div", fn_div);
+  // DEFUN("mod", fn_mod);
   DEFUN("not", fn_not);
   // DEFUN(">", fn_gt);
   // DEFUN("<", fn_lt);
