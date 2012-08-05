@@ -15,8 +15,9 @@ static void define_primitives(struct env *env);
 static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
+static void gc(void);
 
-static jmp_buf env_buf;
+static jmp_buf err_env;
 static const char *err_msg;
 
 int main(int argc, char **argv) {
@@ -24,7 +25,7 @@ int main(int argc, char **argv) {
   for (;;) {
     struct exp *e;
     printf("yoshi> ");
-    if (!setjmp(env_buf)) {
+    if (!setjmp(err_env)) {
       if ((e = read()) == NULL) {
         return 0;
       }
@@ -32,13 +33,14 @@ int main(int argc, char **argv) {
     } else {
       printf("error: %s\n", err_msg);
     }
+    gc();
   }
 }
 
 static void *ensure(int exp, const char *msg) {
   if (!exp) {
     err_msg = msg;
-    longjmp(env_buf, 1);
+    longjmp(err_env, 1);
   }
   return NULL;
 }
@@ -101,7 +103,7 @@ static struct exp *read(void) {
   case '(':
     return read_pair();
   case ')':
-    error("bad input");
+    return error("bad input");
   default:
     ungetc(c, stdin);
     return read_atom();
@@ -273,7 +275,7 @@ static struct exp *apply(struct exp *fn, struct exp *args, struct env *env) {
       struct env *new_env = extend_env(fn->value.closure.params, args,
                                        fn->value.closure.env);
       struct exp *exp = fn->value.closure.body;
-      struct exp *result;
+      struct exp *result = OK;
       while (exp != NIL) {
         result = eval(car(exp), new_env);
         exp = cdr(exp);
@@ -563,22 +565,6 @@ static void print(struct exp *exp) {
   }
 }
 
-struct exp *fn_eq(struct exp *args) {
-  size_t len = list_length(args);
-  ensure(len >= 2, "= requires at least two arguments");
-  struct exp *first = car(args);
-  ensure(first->type == FIXNUM, "= requires numeric arguments");
-  args = cdr(args);
-  while (args != NIL) {
-    ensure(car(args)->type == FIXNUM, "= requires numeric arguments");
-    if (first->value.fixnum != car(args)->value.fixnum) {
-      return FALSE;
-    }
-    args = cdr(args);
-  }
-  return TRUE;
-}
-
 struct exp *fn_add(struct exp *args) {
   long acc = 0;
   ensure(list_length(args) > 0, "+ requires at least one argument");
@@ -621,6 +607,27 @@ struct exp *fn_mul(struct exp *args) {
   return make_fixnum(acc);
 }
 
+struct exp *fn_eq(struct exp *args) {
+  size_t len = list_length(args);
+  ensure(len >= 2, "= requires at least two arguments");
+  struct exp *first = car(args);
+  ensure(first->type == FIXNUM, "= requires numeric arguments");
+  args = cdr(args);
+  while (args != NIL) {
+    ensure(car(args)->type == FIXNUM, "= requires numeric arguments");
+    if (first->value.fixnum != car(args)->value.fixnum) {
+      return FALSE;
+    }
+    args = cdr(args);
+  }
+  return TRUE;
+}
+
+struct exp *fn_not(struct exp *args) {
+  ensure(list_length(args) == 1, "not requires exactly one argument");
+  return car(args) == FALSE ? TRUE : FALSE;
+}
+
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = malloc(sizeof *e);
@@ -631,9 +638,31 @@ static void define_primitive(struct env *env, char *symbol,
 
 static void define_primitives(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
-  DEFUN("=", fn_eq);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
+  // DEFUN("/", fn_div);
+  DEFUN("not", fn_not);
+  // DEFUN(">", fn_gt);
+  // DEFUN("<", fn_lt);
+  // DEFUN(">=", fn_ge);
+  // DEFUN("<=", fn_le);
+  DEFUN("=", fn_eq);
+  // DEFUN("equal?", fn_equal_p);
+  // DEFUN("eq?", fn_eq_p);
+  // DEFUN("length", fn_length);
+  // DEFUN("cons", fn_cons);
+  // DEFUN("car", fn_car);
+  // DEFUN("cdr", fn_cdr);
+  // DEFUN("append", fn_append);
+  // DEFUN("list", fn_list);
+  // DEFUN("list?", fn_list_p);
+  // DEFUN("null?", fn_null_p);
+  // DEFUN("symbol?", fn_symbol_p);
+  // need some math vars also
 #undef DEFUN
+}
+
+static void gc(void) {
+
 }
