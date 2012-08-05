@@ -659,7 +659,7 @@ static void define_primitives(struct env *env) {
   // DEFUN("list?", fn_list_p);
   // DEFUN("null?", fn_null_p);
   // DEFUN("symbol?", fn_symbol_p);
-  // need some math vars also
+  // need some math vars also, maybe
 #undef DEFUN
 }
 
