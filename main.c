@@ -276,7 +276,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
 static struct exp *apply(struct exp *fn, struct exp *args, struct env *env) {
   switch (fn->type) {
   case FUNCTION:
-    return fn->value.function(args);
+    return (*fn->value.function)(args);
   case CLOSURE:
     {
       struct env *new_env = extend_env(fn->value.closure.params, args,
@@ -551,7 +551,7 @@ static char *stringify(struct exp *exp) {
           break;
         } else {
           CAT(" . ");
-          CAT(stringify(exp->value.pair.first));
+          CAT(stringify(exp));
           break;
         }
       }
@@ -592,7 +592,7 @@ static void print(struct exp *exp) {
   }
 }
 
-struct exp *fn_add(struct exp *args) {
+static struct exp *fn_add(struct exp *args) {
   long acc = 0;
   ensure(list_length(args) > 0, "+ requires at least one argument");
   while (args != NIL) {
@@ -604,7 +604,7 @@ struct exp *fn_add(struct exp *args) {
   return make_fixnum(acc);
 }
 
-struct exp *fn_sub(struct exp *args) {
+static struct exp *fn_sub(struct exp *args) {
   size_t len = list_length(args);
   ensure(len > 0, "- requires at least one argument");
   ensure(car(args)->type == FIXNUM, "- requires numeric arguments");
@@ -622,7 +622,7 @@ struct exp *fn_sub(struct exp *args) {
   return make_fixnum(acc);
 }
 
-struct exp *fn_mul(struct exp *args) {
+static struct exp *fn_mul(struct exp *args) {
   long acc = 1;
   ensure(list_length(args) > 0, "* requires at least one argument");
   while (args != NIL) {
@@ -634,7 +634,61 @@ struct exp *fn_mul(struct exp *args) {
   return make_fixnum(acc);
 }
 
-struct exp *fn_eq(struct exp *args) {
+static struct exp *fn_div(struct exp *args) {
+  ensure(list_length(args) == 2, "div requires exactly two arguments");
+  struct exp *a = car(args);
+  struct exp *b = nth(args, 1);
+  ensure(a->type == FIXNUM && b->type == FIXNUM,
+         "div requires numeric arguments");
+  return make_fixnum(a->value.fixnum / b->value.fixnum);
+}
+
+static struct exp *fn_mod(struct exp *args) {
+  ensure(list_length(args) == 2, "mod requires exactly two arguments");
+  struct exp *a = car(args);
+  struct exp *b = nth(args, 1);
+  ensure(a->type == FIXNUM && b->type == FIXNUM,
+         "mod requires numeric arguments");
+  return make_fixnum(a->value.fixnum % b->value.fixnum);
+}
+
+static struct exp *fn_gt(struct exp *args) {
+  ensure(list_length(args) == 2, "> requires exactly two arguments");
+  struct exp *a = nth(args, 0);
+  struct exp *b = nth(args, 1);
+  ensure(a->type == FIXNUM && b->type == FIXNUM,
+         "> requires numeric arguments");
+  return a->value.fixnum > b->value.fixnum ? TRUE : FALSE;
+}
+
+static struct exp *fn_lt(struct exp *args) {
+  ensure(list_length(args) == 2, "< requires exactly two arguments");
+  struct exp *a = nth(args, 0);
+  struct exp *b = nth(args, 1);
+  ensure(a->type == FIXNUM && b->type == FIXNUM,
+         "< requires numeric arguments");
+  return a->value.fixnum < b->value.fixnum ? TRUE : FALSE;
+}
+
+static struct exp *fn_ge(struct exp *args) {
+  ensure(list_length(args) == 2, ">= requires exactly two arguments");
+  struct exp *a = nth(args, 0);
+  struct exp *b = nth(args, 1);
+  ensure(a->type == FIXNUM && b->type == FIXNUM,
+         ">= requires numeric arguments");
+  return a->value.fixnum >= b->value.fixnum ? TRUE : FALSE;
+}
+
+static struct exp *fn_le(struct exp *args) {
+  ensure(list_length(args) == 2, "<= requires exactly two arguments");
+  struct exp *a = nth(args, 0);
+  struct exp *b = nth(args, 1);
+  ensure(a->type == FIXNUM && b->type == FIXNUM,
+         "<= requires numeric arguments");
+  return a->value.fixnum <= b->value.fixnum ? TRUE : FALSE;
+}
+
+static struct exp *fn_eq(struct exp *args) {
   size_t len = list_length(args);
   ensure(len >= 2, "= requires at least two arguments");
   struct exp *first = car(args);
@@ -650,9 +704,180 @@ struct exp *fn_eq(struct exp *args) {
   return TRUE;
 }
 
-struct exp *fn_not(struct exp *args) {
+static struct exp *fn_not(struct exp *args) {
   ensure(list_length(args) == 1, "not requires exactly one argument");
   return car(args) == FALSE ? TRUE : FALSE;
+}
+
+static struct exp *fn_eq_p(struct exp *args) {
+  if (list_length(args) < 2) {
+    return TRUE;
+  } else {
+    struct exp *a = nth(args, 0);
+    struct exp *b = nth(args, 1);
+    if (a->type != b->type) {
+      return FALSE;
+    } else {
+      switch (a->type) {
+      case FIXNUM:
+        if (a->value.fixnum != b->value.fixnum) {
+          return FALSE;
+        }
+        break;
+      case SYMBOL:
+        if (strcmp(a->value.symbol, b->value.symbol) != 0) {
+          return FALSE;
+        }
+        break;
+      default:
+        if (a != b) {
+          return FALSE;
+        }
+        break;
+      }
+    }
+    return fn_eq_p(cdr(args));
+  }
+}
+
+static int sexp_eq(struct exp *a, struct exp *b) {
+  if (a->type != b->type) {
+    return 0;
+  } else {
+    switch (a->type) {
+    case FIXNUM:
+      return a->value.fixnum == b->value.fixnum;
+    case SYMBOL:
+      return !strcmp(a->value.symbol, b->value.symbol);
+    case PAIR:
+      return sexp_eq(a->value.pair.first, b->value.pair.first)
+        && sexp_eq(a->value.pair.rest, b->value.pair.rest);
+    default:
+      return a == b;
+    }
+  }
+}
+
+static struct exp *fn_equal_p(struct exp *args) {
+  if (list_length(args) < 2) {
+    return TRUE;
+  } else {
+    struct exp *a = nth(args, 0);
+    struct exp *b = nth(args, 1);
+    if (a->type != b->type) {
+      return FALSE;
+    } else if (a->type == PAIR) {
+      if (!sexp_eq(a, b)) {
+        return FALSE;
+      }
+      return fn_equal_p(cdr(args));
+    } else {
+      return fn_eq_p(args);
+    }
+  }
+}
+
+static struct exp *fn_length(struct exp *args) {
+  ensure(list_length(args) == 1, "length requires exactly one argument");
+  args = car(args);
+  long acc = 0;
+  while (args != NIL) {
+    ensure(args->type == PAIR, "length requires a list argument");
+    acc += 1;
+    args = args->value.pair.rest;
+  }
+  return make_fixnum(acc);
+}
+
+static struct exp *fn_cons(struct exp *args) {
+  ensure(list_length(args) == 2, "cons requires exactly two arguments");
+  struct exp *a = nth(args, 0);
+  struct exp *b = nth(args, 1);
+  struct exp *pair = make_pair();
+  pair->value.pair.first = a;
+  pair->value.pair.rest = b;
+  return pair;
+}
+
+static struct exp *fn_car(struct exp *args) {
+  ensure(list_length(args) == 1, "car requires exactly one argument");
+  args = nth(args, 0);
+  ensure(args->type == PAIR, "car requires a pair argument");
+  return car(args);
+}
+
+static struct exp *fn_cdr(struct exp *args) {
+  ensure(list_length(args) == 1, "cdr requires exactly one argument");
+  args = nth(args, 0);
+  ensure(args->type == PAIR, "cdr requires a pair argument");
+  return cdr(args);
+}
+
+static struct exp *fn_append(struct exp *args) {
+  if (list_length(args) == 0) {
+    return NIL;
+  } else if (list_length(car(args)) == 0) {
+    return fn_append(cdr(args));
+  } else {
+    struct exp *new_list = make_pair();
+    struct exp *node = new_list;
+    struct exp *old_list = car(args);
+    node->value.pair.first = car(old_list);
+    for (;;) {
+      old_list = cdr(old_list);
+      if (old_list == NIL) {
+        node->value.pair.rest = fn_append(cdr(args));
+        return new_list;
+      } else {
+        ensure(old_list->type == PAIR, "append requires list arguments");
+        node->value.pair.rest = make_pair();
+        node = node->value.pair.rest;
+        node->value.pair.first = car(old_list);
+      }
+    }
+  }
+}
+
+static struct exp *fn_list(struct exp *args) {
+  if (args == NIL) {
+    return NIL;
+  } else {
+    struct exp *list = make_pair();
+    list->value.pair.first = car(args);
+    list->value.pair.rest = fn_list(cdr(args));
+    return list;
+  }
+}
+
+static struct exp *fn_list_p(struct exp *args) {
+  ensure(list_length(args) == 1, "list? requires exactly one argument");
+  args = car(args);
+  while (args != NIL) {
+    if (args->type != PAIR) {
+      return FALSE;
+    } else {
+      args = cdr(args);
+    }
+  }
+  return TRUE;
+}
+
+static struct exp *fn_null_p(struct exp *args) {
+  ensure(list_length(args) == 1, "null? requires exactly one argument");
+  return car(args) == NIL ? TRUE : FALSE;
+}
+
+static struct exp *fn_symbol_p(struct exp *args) {
+  ensure(list_length(args) == 1, "symbol? requires exactly one argument");
+  return car(args)->type == SYMBOL ? TRUE : FALSE;
+}
+
+static struct exp *fn_print(struct exp *args) {
+  while (args != NIL) {
+    print(car(args));
+    args = args->value.pair.rest;
+  }
+  return OK;
 }
 
 static void define_primitive(struct env *env, char *symbol,
@@ -667,26 +892,26 @@ static void define_primitives(struct env *env) {
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
-  // DEFUN("div", fn_div);
-  // DEFUN("mod", fn_mod);
+  DEFUN("div", fn_div);
+  DEFUN("mod", fn_mod);
   DEFUN("not", fn_not);
-  // DEFUN(">", fn_gt);
-  // DEFUN("<", fn_lt);
-  // DEFUN(">=", fn_ge);
-  // DEFUN("<=", fn_le);
+  DEFUN(">", fn_gt);
+  DEFUN("<", fn_lt);
+  DEFUN(">=", fn_ge);
+  DEFUN("<=", fn_le);
   DEFUN("=", fn_eq);
-  // DEFUN("equal?", fn_equal_p);
-  // DEFUN("eq?", fn_eq_p);
-  // DEFUN("length", fn_length);
-  // DEFUN("cons", fn_cons);
-  // DEFUN("car", fn_car);
-  // DEFUN("cdr", fn_cdr);
-  // DEFUN("append", fn_append);
-  // DEFUN("list", fn_list);
-  // DEFUN("list?", fn_list_p);
-  // DEFUN("null?", fn_null_p);
-  // DEFUN("symbol?", fn_symbol_p);
-  // need some math vars also, maybe
+  DEFUN("eq?", fn_eq_p);
+  DEFUN("equal?", fn_equal_p);
+  DEFUN("length", fn_length);
+  DEFUN("cons", fn_cons);
+  DEFUN("car", fn_car);
+  DEFUN("cdr", fn_cdr);
+  DEFUN("append", fn_append);
+  DEFUN("list", fn_list);
+  DEFUN("list?", fn_list_p);
+  DEFUN("null?", fn_null_p);
+  DEFUN("symbol?", fn_symbol_p);
+  DEFUN("print", fn_print);
 #undef DEFUN
 }
 
