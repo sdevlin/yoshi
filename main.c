@@ -18,14 +18,27 @@ static void print(struct exp *exp);
 
 static void gc_collect(void);
 
+static FILE *infile;
+
 static jmp_buf err_env;
 static const char *err_msg;
 
 int main(int argc, char **argv) {
+  if (argc == 1) {
+    infile = stdin;
+  } else if (argc == 2) {
+    argv += 1;
+    infile = fopen(*argv, "r");
+  } else {
+    fprintf(stderr, "usage: yoshi [infile]\n");
+    exit(1);
+  }
   define_primitives(&global_env);
   for (;;) {
     struct exp *e;
-    printf("yoshi> ");
+    if (infile == stdin) {
+      printf("yoshi> ");
+    }
     if (!setjmp(err_env)) {
       if ((e = read()) == NULL) {
         return 0;
@@ -104,7 +117,7 @@ static struct exp *read_pair(void);
 static struct exp *read(void) {
   int c;
   eat_space();
-  c = getc(stdin);
+  c = getc(infile);
   switch (c) {
   case EOF:
     return NULL;
@@ -113,16 +126,16 @@ static struct exp *read(void) {
   case ')':
     return error("bad input");
   default:
-    ungetc(c, stdin);
+    ungetc(c, infile);
     return read_atom();
   }
 }
 
 static void eat_space(void) {
   for (;;) {
-    int c = getc(stdin);
+    int c = getc(infile);
     if (!isspace(c)) {
-      ungetc(c, stdin);
+      ungetc(c, infile);
       return;
     }
   }
@@ -135,9 +148,9 @@ static struct exp *read_atom(void) {
   size_t cap = 8;
   char *buf = malloc(cap);
   for (;;) {
-    int c = getc(stdin);
+    int c = getc(infile);
     if (isspace(c) || c == '(' || c == ')') {
-      ungetc(c, stdin);
+      ungetc(c, infile);
       buf[len] = '\0';
       return make_atom(buf);
     } else {
@@ -157,10 +170,10 @@ static struct exp *read_pair(void) {
   struct exp *pair;
   int c;
   eat_space();
-  if ((c = getc(stdin)) == ')') {
+  if ((c = getc(infile)) == ')') {
     return NIL;
   } else {
-    ungetc(c, stdin);
+    ungetc(c, infile);
     pair = make_pair();
     pair->value.pair.first = read();
     pair->value.pair.rest = read_pair();
