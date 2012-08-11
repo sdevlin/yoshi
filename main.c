@@ -702,7 +702,6 @@ static void gc_free(struct exp *exp);
 static void gc_collect(void) {
   gc_mark(&global_env);
   gc_sweep();
-  printf("managing %d objects\n", gc.count);
 }
 
 static void gc_mark_exp(struct exp *exp) {
