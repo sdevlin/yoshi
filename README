@@ -4,8 +4,6 @@ I wanted to keep things all in one file for simplicity. It might be a little dis
 
 The eval/apply definitions are based on SICP 4.1. The list of built-in functions I chose to include is mostly based on Peter Norvig's lispy. (Most diversions are due to fixnum's being the sole numeric type I support.)
 
-This program leaks memory like a sieve. Deal with it.
-
-Actually, this is mostly because I was too lazy to write a garbage collector for it. Maybe I'll get around to it.
+I wrote a garbage collector, but I think this program still leaks a little memory. Deal with it.
 
 RIP Dennis Ritchie and John McCarthy.
