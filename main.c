@@ -15,7 +15,8 @@ static void define_primitives(struct env *env);
 static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
-static void gc(void);
+
+static void gc_collect(void);
 
 static jmp_buf err_env;
 static const char *err_msg;
@@ -33,7 +34,7 @@ int main(int argc, char **argv) {
     } else {
       printf("error: %s\n", err_msg);
     }
-    gc();
+    gc_collect();
   }
 }
 
@@ -59,6 +60,11 @@ enum exp_type {
   CONSTANT
 };
 
+enum mark_type {
+  FREE,
+  KEEP
+};
+
 struct exp {
   enum exp_type type;
   union {
@@ -75,6 +81,8 @@ struct exp {
       struct env *env;
     } closure;
   } value;
+  enum mark_type mark;
+  struct exp *next;
 };
 
 static struct exp nil = { CONSTANT };
@@ -160,10 +168,11 @@ static struct exp *read_pair(void) {
   }
 }
 
+static struct exp *gc_alloc(enum exp_type type);
+
 // refactor make_atom to use this
 static struct exp *make_fixnum(long fixnum) {
-  struct exp *e = malloc(sizeof *e);
-  e->type = FIXNUM;
+  struct exp *e = gc_alloc(FIXNUM);
   e->value.fixnum = fixnum;
   return e;
 }
@@ -176,8 +185,7 @@ static struct exp *make_atom(char *buf) {
   } else {
     size_t len = strlen(buf);
     size_t i = buf[0] == '-' ? 1 : 0;
-    struct exp *e = malloc(sizeof *e);
-    e->type = SYMBOL;
+    struct exp *e = gc_alloc(SYMBOL);
     for (; i < len; i += 1) {
       if (isdigit(buf[i])) {
         e->type = FIXNUM;
@@ -203,8 +211,7 @@ static struct exp *make_atom(char *buf) {
 }
 
 static struct exp *make_pair(void) {
-  struct exp *pair = malloc(sizeof *pair);
-  pair->type = PAIR;
+  struct exp *pair = gc_alloc(PAIR);
   pair->value.pair.first = NULL;
   pair->value.pair.rest = NULL;
   return pair;
@@ -357,8 +364,7 @@ static struct exp *cond_to_if(struct exp *conds) {
 
 static struct exp *make_closure(struct exp *params, struct exp *body,
                                 struct env *env) {
-  struct exp *e = malloc(sizeof *e);
-  e->type = CLOSURE;
+  struct exp *e = gc_alloc(CLOSURE);
   e->value.closure.params = params;
   e->value.closure.body = body;
   e->value.closure.env = env;
@@ -406,53 +412,69 @@ struct env {
   struct env *parent;
 };
 
-static struct exp *env_define(struct env *env, char *symbol,
-                              struct exp *value) {
-  struct binding *b = malloc(sizeof *b);
-  b->symbol = symbol;
-  b->value = value;
-  b->next = env->bindings;
-  env->bindings = b;
-  return OK;
-}
-
 static struct exp *env_visit(struct env *env, char *symbol, struct exp *value,
-                             struct exp *(*visit)(struct binding *b,
-                                                  struct exp *v)) {
+                             struct exp *(*found)(struct binding *b,
+                                                  struct exp *v),
+                             struct exp *(*not_found)(struct env *env,
+                                                      char *symbol,
+                                                      struct exp *value)) {
+  struct env *e = env;
   do {
-    struct binding *b = env->bindings;
+    struct binding *b = e->bindings;
     while (b != NULL) {
       if (!strcmp(b->symbol, symbol)) {
-        return (*visit)(b, value);
+        return (*found)(b, value);
       }
       b = b->next;
     }
-    env = env->parent;
-  } while (env);
-  return error("env_visit: no binding for symbol");
+    e = e->parent;
+  } while (e != NULL);
+  return (*not_found)(env, symbol, value);
 }
 
-static struct exp *binding_lookup(struct binding *binding, struct exp *_) {
+static struct exp *error_not_found(struct env *env, char *symbol,
+                                   struct exp *value) {
+  return error("env: no binding for symbol");
+}
+
+static struct exp *lookup_found(struct binding *binding, struct exp *_) {
   return binding->value;
 }
 
 static struct exp *env_lookup(struct env *env, char *symbol) {
-  return env_visit(env, symbol, NULL, &binding_lookup);
+  return env_visit(env, symbol, NULL, &lookup_found, &error_not_found);
 }
 
-static struct exp *binding_update(struct binding *binding, struct exp *value) {
+static struct exp *update_found(struct binding *binding, struct exp *value) {
   binding->value = value;
   return OK;
 }
 
 static struct exp *env_update(struct env *env, char *symbol,
                               struct exp *value) {
-  return env_visit(env, symbol, value, &binding_update);
+  return env_visit(env, symbol, value, &update_found, &error_not_found);
+}
+
+static struct exp *define_not_found(struct env *env, char *symbol,
+                                    struct exp *value) {
+  struct binding *b = malloc(sizeof *b);
+  b->symbol = malloc(strlen(symbol) + 1);
+  strcpy(b->symbol, symbol);
+  b->value = value;
+  b->next = env->bindings;
+  env->bindings = b;
+  return OK;
+}
+
+static struct exp *env_define(struct env *env, char *symbol,
+                              struct exp *value) {
+  return env_visit(env, symbol, value, &update_found, &define_not_found);
 }
 
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent) {
   struct env *env = malloc(sizeof *env);
+  env->bindings = NULL;
   env->parent = parent;
   ensure(list_length(params) == list_length(args),
          "wrong number of args in application");
@@ -544,7 +566,12 @@ static char *stringify(struct exp *exp) {
     buf = malloc(12);
     sprintf(buf, "%s", "#<closure>");
     return buf;
+  case UNDEFINED:
+    buf = malloc(13);
+    sprintf(buf, "%s", "#<undefined>");
+    return buf;
   default:
+    printf("exp type %d\n", exp->type);
     return error("stringify: bad exp type");
   }
 }
@@ -630,8 +657,7 @@ struct exp *fn_not(struct exp *args) {
 
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
-  struct exp *e = malloc(sizeof *e);
-  e->type = FUNCTION;
+  struct exp *e = gc_alloc(FUNCTION);
   e->value.function = function;
   env_define(env, symbol, e);
 }
@@ -664,6 +690,79 @@ static void define_primitives(struct env *env) {
 #undef DEFUN
 }
 
-static void gc(void) {
+static struct {
+  struct exp root;
+  size_t count;
+} gc;
 
+static void gc_mark(struct env *env);
+static void gc_sweep(void);
+static void gc_free(struct exp *exp);
+
+static void gc_collect(void) {
+  gc_mark(&global_env);
+  gc_sweep();
+  printf("managing %d objects\n", gc.count);
+}
+
+static void gc_mark_exp(struct exp *exp) {
+  if (exp->mark) {
+    return;
+  }
+  exp->mark = KEEP;
+  switch (exp->type) {
+  case PAIR:
+    gc_mark_exp(exp->value.pair.first);
+    gc_mark_exp(exp->value.pair.rest);
+    break;
+  case CLOSURE:
+    gc_mark_exp(exp->value.closure.params);
+    gc_mark_exp(exp->value.closure.body);
+    gc_mark(exp->value.closure.env);
+    break;
+  default:
+    break;
+  }
+}
+
+static void gc_mark(struct env *env) {
+  struct binding *b = env->bindings;
+  while (b != NULL) {
+    gc_mark_exp(b->value);
+    b = b->next;
+  }
+}
+
+static void gc_sweep(void) {
+  struct exp *prev = &gc.root;
+  struct exp *curr = prev->next;
+  while (curr != NULL) {
+    if (curr->mark) {
+      curr->mark = FREE;
+      prev = curr;
+      curr = curr->next;
+    } else {
+      prev->next = curr->next;
+      gc_free(curr);
+      curr = prev->next;
+    }
+  }
+}
+
+static struct exp *gc_alloc(enum exp_type type) {
+  struct exp *e = malloc(sizeof *e);
+  e->type = type;
+  e->mark = 0;
+  e->next = gc.root.next;
+  gc.root.next = e;
+  gc.count += 1;
+  return e;
+}
+
+static void gc_free(struct exp *exp) {
+  if (exp->type == SYMBOL) {
+    free(exp->value.symbol);
+  }
+  free(exp);
+  gc.count -= 1;
 }
