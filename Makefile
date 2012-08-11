@@ -20,4 +20,4 @@ clobber : clean
 clean :
 	rm -f *.o || true
 
-.PHONY : all clobber clean
+.PHONY : all install clobber clean
