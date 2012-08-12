@@ -2,7 +2,7 @@ This is yoshi, a LISP-1 interpreter written in C. (The syntax and semantics are 
 
 I wanted to keep things all in one file for simplicity. It might be a little disorganized as a result. I hope it's not too tough to follow.
 
-The eval/apply definitions are based on SICP 4.1. The list of built-in functions I chose to include is mostly based on Peter Norvig's lispy. (Most diversions are due to fixnum's being the sole numeric type I support.)
+The eval/apply definitions are based on SICP 4.1. The list of built-in functions I chose to include is mostly based on Peter Norvig's lispy. (Most diversions are due to fixnums being the sole numeric type I support.)
 
 I wrote a garbage collector, but I think this program still leaks a little memory. Deal with it.
 
