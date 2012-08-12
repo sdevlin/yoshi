@@ -141,6 +141,7 @@ static struct exp false = { CONSTANT };
 #define FALSE (&false)
 
 static void eat_space(void);
+static void eat_until(int c);
 static struct exp *read_atom(void);
 static struct exp *read_pair(void);
 static struct exp *make_atom(char *buf);
@@ -160,9 +161,7 @@ static struct exp *read(void) {
   case '\'':
     return make_list(make_atom("quote"), read(), NULL);
   case ';':
-    while (c != '\n') {
-      c = getc(infile);
-    }
+    eat_until('\n');
     return read();
   default:
     ungetc(c, infile);
@@ -175,6 +174,14 @@ static void eat_space(void) {
     int c = getc(infile);
     if (!isspace(c)) {
       ungetc(c, infile);
+      return;
+    }
+  }
+}
+
+static void eat_until(int c) {
+  for (;;) {
+    if (c == getc(infile)) {
       return;
     }
   }
