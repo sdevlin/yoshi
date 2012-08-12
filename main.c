@@ -915,14 +915,6 @@ static struct exp *fn_symbol_p(struct exp *args) {
   return car(args)->type == SYMBOL ? TRUE : FALSE;
 }
 
-static struct exp *fn_print(struct exp *args) {
-  while (args != NIL) {
-    print(car(args));
-    args = args->value.pair.rest;
-  }
-  return OK;
-}
-
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = gc_alloc(FUNCTION);
@@ -954,7 +946,6 @@ static void define_primitives(struct env *env) {
   DEFUN("list?", fn_list_p);
   DEFUN("null?", fn_null_p);
   DEFUN("symbol?", fn_symbol_p);
-  DEFUN("print", fn_print);
 #undef DEFUN
 }
 

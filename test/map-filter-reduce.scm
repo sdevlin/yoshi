@@ -5,8 +5,8 @@
         (cons (f (car l))
               (map f (cdr l))))))
 
-(print (map (lambda (x) (* x x x))
-            (list 1 2 3 4 5)))
+(map (lambda (x) (* x x x))
+     (list 1 2 3 4 5))
 
 (define filter
   (lambda (f l)
@@ -16,8 +16,8 @@
             (cons (car l) (filter f (cdr l)))
             (filter f (cdr l))))))
 
-(print (filter (lambda (x) (= (mod x 2) 0))
-               (list 1 2 3 4 5 6 7)))
+(filter (lambda (x) (= (mod x 2) 0))
+        (list 1 2 3 4 5 6 7))
 
 (define reduce
   (lambda (f l acc)
@@ -25,4 +25,4 @@
         acc
         (reduce f (cdr l) (f (car l) acc)))))
 
-(print (reduce + (list 1 2 3 4 5) 0))
+(reduce + (list 1 2 3 4 5) 0)
