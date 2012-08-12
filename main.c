@@ -18,22 +18,35 @@ static void print(struct exp *exp);
 
 static void gc_collect(void);
 
+static size_t file_count;
+static char **file_names;
 static FILE *infile;
+static FILE *next_file(void);
+static int interactive_flag;
 
 static jmp_buf err_env;
 static const char *err_msg;
 
 int main(int argc, char **argv) {
-  if (argc == 1) {
-    infile = stdin;
-  } else if (argc == 2) {
+  argc -= 1;
+  argv += 1;
+  while (argc > 0) {
+    char *arg = *argv;
+    if (!strcmp(arg, "-i")) {
+      interactive_flag = 1;
+    } else {
+      file_count += 1;
+      file_names = realloc(file_names, file_count);
+      file_names[file_count - 1] = arg;
+    }
+    argc -= 1;
     argv += 1;
-    infile = fopen(*argv, "r");
-  } else {
-    fprintf(stderr, "usage: yoshi [infile]\n");
-    exit(1);
+  }
+  if (file_count == 0) {
+    interactive_flag = 1;
   }
   define_primitives(&global_env);
+  infile = next_file();
   for (;;) {
     struct exp *e;
     if (infile == stdin) {
@@ -41,13 +54,30 @@ int main(int argc, char **argv) {
     }
     if (!setjmp(err_env)) {
       if ((e = read()) == NULL) {
-        return 0;
+        if ((infile = next_file()) == NULL) {
+          return 0;
+        } else {
+          continue;
+        }
       }
       print(eval(e, &global_env));
     } else {
       printf("error: %s\n", err_msg);
     }
     gc_collect();
+  }
+}
+
+static FILE *next_file(void) {
+  if (file_count > 0) {
+    FILE *f = fopen(*file_names, "r");
+    file_count -= 1;
+    file_names += 1;
+    return f;
+  } else if (infile != stdin && interactive_flag) {
+    return stdin;
+  } else {
+    return NULL;
   }
 }
 
