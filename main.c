@@ -159,6 +159,11 @@ static struct exp *read(void) {
     return error("bad input");
   case '\'':
     return make_list(make_atom("quote"), read(), NULL);
+  case ';':
+    while (c != '\n') {
+      c = getc(infile);
+    }
+    return read();
   default:
     ungetc(c, infile);
     return read_atom();

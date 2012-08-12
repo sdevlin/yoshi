@@ -1,3 +1,5 @@
+;; The fixed point combinator
+
 (define Y
   (lambda (f)
     ((lambda (x) (f (lambda (v) ((x x) v))))
@@ -11,3 +13,4 @@
              (* n (f (- n 1))))))))
 
 (fact 10)
+;; 3628800
