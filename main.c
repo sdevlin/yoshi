@@ -158,7 +158,7 @@ static struct exp *read(void) {
   case ')':
     return error("bad input");
   case '\'':
-    return make_list(make_atom("quote"), read(), NIL);
+    return make_list(make_atom("quote"), read(), NULL);
   default:
     ungetc(c, infile);
     return read_atom();
@@ -232,9 +232,8 @@ static struct exp *make_list(struct exp *first, ...) {
   va_start(args, first);
   for (;;) {
     struct exp *next = va_arg(args, struct exp *);
-    assert(next != NULL);
-    if (next == NIL) {
-      node->value.pair.rest = next;
+    if (next == NULL) {
+      node->value.pair.rest = NIL;
       break;
     } else {
       node->value.pair.rest = make_pair();
@@ -404,7 +403,7 @@ static struct exp *cond_to_if(struct exp *conds) {
                      symbol_eq(pred, "else") ? TRUE : pred,
                      nth(car(conds), 1),
                      cond_to_if(cdr(conds)),
-                     NIL);
+                     NULL);
   }
 }
 
