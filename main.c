@@ -143,6 +143,8 @@ static struct exp false = { CONSTANT };
 static void eat_space(void);
 static struct exp *read_atom(void);
 static struct exp *read_pair(void);
+static struct exp *make_atom(char *buf);
+static struct exp *make_list(struct exp *first, ...);
 
 static struct exp *read(void) {
   int c;
@@ -155,6 +157,8 @@ static struct exp *read(void) {
     return read_pair();
   case ')':
     return error("bad input");
+  case '\'':
+    return make_list(make_atom("quote"), read(), NIL);
   default:
     ungetc(c, infile);
     return read_atom();
@@ -170,8 +174,6 @@ static void eat_space(void) {
     }
   }
 }
-
-static struct exp *make_atom(char *buf);
 
 static struct exp *read_atom(void) {
   size_t len = 0;
@@ -220,6 +222,30 @@ static struct exp *make_fixnum(long fixnum) {
   return e;
 }
 
+static struct exp *make_list(struct exp *first, ...) {
+  struct exp *list;
+  struct exp *node;
+  va_list args;
+  assert(first != NULL);
+  list = node = make_pair();
+  node->value.pair.first = first;
+  va_start(args, first);
+  for (;;) {
+    struct exp *next = va_arg(args, struct exp *);
+    assert(next != NULL);
+    if (next == NIL) {
+      node->value.pair.rest = next;
+      break;
+    } else {
+      node->value.pair.rest = make_pair();
+      node = node->value.pair.rest;
+      node->value.pair.first = next;
+    }
+  }
+  va_end(args);
+  return list;
+}
+
 static struct exp *make_atom(char *buf) {
   if (!strcmp(buf, "#t")) {
     return TRUE;
@@ -239,7 +265,8 @@ static struct exp *make_atom(char *buf) {
     }
     switch (e->type) {
     case SYMBOL:
-      e->value.symbol = buf;
+      e->value.symbol = malloc(len + 1);
+      strcpy(e->value.symbol, buf);
       break;
     case FIXNUM:
       // not handling overflow
@@ -366,30 +393,6 @@ static struct exp *eval_begin(struct exp *forms, struct env *env) {
     forms = cdr(forms);
   }
   return result;
-}
-
-static struct exp *make_list(struct exp *first, ...) {
-  struct exp *list;
-  struct exp *node;
-  va_list args;
-  assert(first != NULL);
-  list = node = make_pair();
-  node->value.pair.first = first;
-  va_start(args, first);
-  for (;;) {
-    struct exp *next = va_arg(args, struct exp *);
-    assert(next != NULL);
-    if (next == NIL) {
-      node->value.pair.rest = next;
-      break;
-    } else {
-      node->value.pair.rest = make_pair();
-      node = node->value.pair.rest;
-      node->value.pair.first = next;
-    }
-  }
-  va_end(args);
-  return list;
 }
 
 static struct exp *cond_to_if(struct exp *conds) {
