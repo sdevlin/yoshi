@@ -6,6 +6,6 @@ The eval/apply definitions are based on SICP 4.1. The list of built-in functions
 
 This implementation does not perform tail call optimizations. Maybe someday.
 
-I wrote a garbage collector, but I think this program still leaks a little memory. Deal with it.
+I wrote a garbage collector. I think it works, but I have been known to make mistakes from time to time.
 
 RIP Dennis Ritchie and John McCarthy.
