@@ -30,7 +30,7 @@ static const char *err_msg;
 int main(int argc, char **argv) {
   argc -= 1;
   argv += 1;
-  file_names = malloc(argc);
+  file_names = malloc(argc * (sizeof *file_names));
   while (argc > 0) {
     char *arg = *argv;
     if (!strcmp(arg, "-i")) {
@@ -1040,15 +1040,21 @@ static void gc_sweep(void) {
   } while (0)
   SWEEP(exp);
   SWEEP(env);
+#undef SWEEP
 }
+
+#define MANAGE(type)                            \
+  do {                                          \
+    e->mark = FREE;                             \
+    e->next = gc.type.root.next;                \
+    gc.type.root.next = e;                      \
+    gc.type.count += 1;                         \
+  } while (0)
 
 static struct exp *gc_alloc_exp(enum exp_type type) {
   struct exp *e = malloc(sizeof *e);
   e->type = type;
-  e->mark = FREE;
-  e->next = gc.exp.root.next;
-  gc.exp.root.next = e;
-  gc.exp.count += 1;
+  MANAGE(exp);
   return e;
 }
 
@@ -1056,12 +1062,11 @@ static struct env *gc_alloc_env(struct env *parent) {
   struct env *e = malloc(sizeof *e);
   e->bindings = NULL;
   e->parent = parent;
-  e->mark = FREE;
-  e->next = gc.env.root.next;
-  gc.env.root.next = e;
-  gc.env.count += 1;
+  MANAGE(env);
   return e;
 }
+
+#undef MANAGE
 
 static void gc_free_exp(struct exp *exp) {
   switch (exp->type) {
