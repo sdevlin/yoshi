@@ -965,6 +965,11 @@ static struct exp *fn_list(struct exp *args) {
   }
 }
 
+static struct exp *fn_pair_p(struct exp *args) {
+  ensure(list_length(args) == 1, "pair? requires exactly one argument");
+  return car(args)->type == PAIR ? TRUE : FALSE;
+}
+
 static struct exp *fn_list_p(struct exp *args) {
   ensure(list_length(args) == 1, "list? requires exactly one argument");
   args = car(args);
@@ -1016,6 +1021,7 @@ static void define_primitives(struct env *env) {
   DEFUN("cdr", fn_cdr);
   DEFUN("append", fn_append);
   DEFUN("list", fn_list);
+  DEFUN("pair?", fn_pair_p);
   DEFUN("list?", fn_list_p);
   DEFUN("null?", fn_null_p);
   DEFUN("symbol?", fn_symbol_p);
