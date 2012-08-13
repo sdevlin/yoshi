@@ -1,3 +1,5 @@
+;; Fibonacci number calculator
+
 (define fib
   (lambda (n)
     (define iter
@@ -8,3 +10,4 @@
     (iter 0 1 0)))
 
 (fib 30)
+;; 832040
