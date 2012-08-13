@@ -1019,6 +1019,9 @@ static void gc_mark_env(struct env *env) {
     gc_mark_exp(b->value);
     b = b->next;
   }
+  if (env->parent != NULL) {
+    gc_mark_env(env->parent);
+  }
 }
 
 static void gc_sweep(void) {
