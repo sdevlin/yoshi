@@ -30,13 +30,13 @@ static const char *err_msg;
 int main(int argc, char **argv) {
   argc -= 1;
   argv += 1;
+  file_names = malloc(argc);
   while (argc > 0) {
     char *arg = *argv;
     if (!strcmp(arg, "-i")) {
       interactive_flag = 1;
     } else {
       file_count += 1;
-      file_names = realloc(file_names, file_count);
       file_names[file_count - 1] = arg;
     }
     argc -= 1;
@@ -69,10 +69,10 @@ int main(int argc, char **argv) {
 }
 
 static FILE *next_file(void) {
-  if (file_count > 0) {
-    FILE *f = fopen(*file_names, "r");
-    file_count -= 1;
-    file_names += 1;
+  static size_t i = 0;
+  if (i < file_count) {
+    FILE *f = fopen(*(file_names + i), "r");
+    i += 1;
     return f;
   } else if (infile != stdin && interactive_flag) {
     return stdin;
@@ -196,7 +196,9 @@ static struct exp *read_atom(void) {
     if (isspace(c) || c == '(' || c == ')') {
       ungetc(c, infile);
       buf[len] = '\0';
-      return make_atom(buf);
+      struct exp *e = make_atom(buf);
+      free(buf);
+      return e;
     } else {
       if (len + 1 == cap) {
         cap *= 2;
@@ -225,11 +227,11 @@ static struct exp *read_pair(void) {
   }
 }
 
-static struct exp *gc_alloc(enum exp_type type);
+static struct exp *gc_alloc_exp(enum exp_type type);
 
 // refactor make_atom to use this
 static struct exp *make_fixnum(long fixnum) {
-  struct exp *e = gc_alloc(FIXNUM);
+  struct exp *e = gc_alloc_exp(FIXNUM);
   e->value.fixnum = fixnum;
   return e;
 }
@@ -265,7 +267,7 @@ static struct exp *make_atom(char *buf) {
   } else {
     size_t len = strlen(buf);
     size_t i = buf[0] == '-' ? 1 : 0;
-    struct exp *e = gc_alloc(SYMBOL);
+    struct exp *e = gc_alloc_exp(SYMBOL);
     for (; i < len; i += 1) {
       if (isdigit(buf[i])) {
         e->type = FIXNUM;
@@ -292,7 +294,7 @@ static struct exp *make_atom(char *buf) {
 }
 
 static struct exp *make_pair(void) {
-  struct exp *pair = gc_alloc(PAIR);
+  struct exp *pair = gc_alloc_exp(PAIR);
   pair->value.pair.first = NULL;
   pair->value.pair.rest = NULL;
   return pair;
@@ -421,7 +423,7 @@ static struct exp *cond_to_if(struct exp *conds) {
 
 static struct exp *make_closure(struct exp *params, struct exp *body,
                                 struct env *env) {
-  struct exp *e = gc_alloc(CLOSURE);
+  struct exp *e = gc_alloc_exp(CLOSURE);
   e->value.closure.params = params;
   e->value.closure.body = body;
   e->value.closure.env = env;
@@ -467,6 +469,8 @@ struct env {
     struct binding *next;
   } *bindings;
   struct env *parent;
+  enum mark_type mark;
+  struct env *next;
 };
 
 static struct exp *env_visit(struct env *env, char *symbol, struct exp *value,
@@ -528,11 +532,11 @@ static struct exp *env_define(struct env *env, char *symbol,
   return env_visit(env, symbol, value, &update_found, &define_not_found);
 }
 
+static struct env *gc_alloc_env(struct env *parent);
+
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent) {
-  struct env *env = malloc(sizeof *env);
-  env->bindings = NULL;
-  env->parent = parent;
+  struct env *env = gc_alloc_env(parent);
   ensure(list_length(params) == list_length(args),
          "wrong number of args in application");
   while (params != NIL) {
@@ -600,7 +604,9 @@ static char *stringify(struct exp *exp) {
       buf[len] = '\0';
       CAT("(");
       for (;;) {
-        CAT(stringify(exp->value.pair.first));
+        char *s = stringify(car(exp));
+        CAT(s);
+        free(s);
         exp = exp->value.pair.rest;
         if (exp->type == PAIR) {
           CAT(" ");
@@ -608,7 +614,9 @@ static char *stringify(struct exp *exp) {
           break;
         } else {
           CAT(" . ");
-          CAT(stringify(exp));
+          s = stringify(exp);
+          CAT(s);
+          free(s);
           break;
         }
       }
@@ -931,7 +939,7 @@ static struct exp *fn_symbol_p(struct exp *args) {
 
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
-  struct exp *e = gc_alloc(FUNCTION);
+  struct exp *e = gc_alloc_exp(FUNCTION);
   e->value.function = function;
   env_define(env, symbol, e);
 }
@@ -964,16 +972,23 @@ static void define_primitives(struct env *env) {
 }
 
 static struct {
-  struct exp root;
-  size_t count;
+  struct {
+    struct exp root;
+    size_t count;
+  } exp;
+  struct {
+    struct env root;
+    size_t count;
+  } env;
 } gc;
 
-static void gc_mark(struct env *env);
+static void gc_mark_env(struct env *env);
 static void gc_sweep(void);
-static void gc_free(struct exp *exp);
+static void gc_free_exp(struct exp *exp);
+static void gc_free_env(struct env *env);
 
 static void gc_collect(void) {
-  gc_mark(&global_env);
+  gc_mark_env(&global_env);
   gc_sweep();
 }
 
@@ -990,14 +1005,15 @@ static void gc_mark_exp(struct exp *exp) {
   case CLOSURE:
     gc_mark_exp(exp->value.closure.params);
     gc_mark_exp(exp->value.closure.body);
-    gc_mark(exp->value.closure.env);
+    gc_mark_env(exp->value.closure.env);
     break;
   default:
     break;
   }
 }
 
-static void gc_mark(struct env *env) {
+static void gc_mark_env(struct env *env) {
+  env->mark = KEEP;
   struct binding *b = env->bindings;
   while (b != NULL) {
     gc_mark_exp(b->value);
@@ -1006,35 +1022,68 @@ static void gc_mark(struct env *env) {
 }
 
 static void gc_sweep(void) {
-  struct exp *prev = &gc.root;
-  struct exp *curr = prev->next;
-  while (curr != NULL) {
-    if (curr->mark) {
-      curr->mark = FREE;
-      prev = curr;
-      curr = curr->next;
-    } else {
-      prev->next = curr->next;
-      gc_free(curr);
-      curr = prev->next;
-    }
-  }
+#define SWEEP(type)                              \
+  do {                                           \
+    struct type *prev = &gc.type.root;           \
+    struct type *curr = prev->next;              \
+    while (curr != NULL) {                       \
+      if (curr->mark) {                          \
+        curr->mark = FREE;                       \
+        prev = curr;                             \
+        curr = curr->next;                       \
+      } else {                                   \
+        prev->next = curr->next;                 \
+        gc_free_ ## type(curr);                  \
+        curr = prev->next;                       \
+      }                                          \
+    }                                            \
+  } while (0)
+  SWEEP(exp);
+  SWEEP(env);
 }
 
-static struct exp *gc_alloc(enum exp_type type) {
+static struct exp *gc_alloc_exp(enum exp_type type) {
   struct exp *e = malloc(sizeof *e);
   e->type = type;
-  e->mark = 0;
-  e->next = gc.root.next;
-  gc.root.next = e;
-  gc.count += 1;
+  e->mark = FREE;
+  e->next = gc.exp.root.next;
+  gc.exp.root.next = e;
+  gc.exp.count += 1;
   return e;
 }
 
-static void gc_free(struct exp *exp) {
-  if (exp->type == SYMBOL) {
+static struct env *gc_alloc_env(struct env *parent) {
+  struct env *e = malloc(sizeof *e);
+  e->bindings = NULL;
+  e->parent = parent;
+  e->mark = FREE;
+  e->next = gc.env.root.next;
+  gc.env.root.next = e;
+  gc.env.count += 1;
+  return e;
+}
+
+static void gc_free_exp(struct exp *exp) {
+  switch (exp->type) {
+  case SYMBOL:
     free(exp->value.symbol);
+    break;
+  default:
+    break;
   }
   free(exp);
-  gc.count -= 1;
+  gc.exp.count -= 1;
+}
+
+static void gc_free_env(struct env *env) {
+  struct binding *prev = NULL;
+  struct binding *curr = env->bindings;
+  while (curr != NULL) {
+    free(curr->symbol);
+    prev = curr;
+    curr = curr->next;
+    free(prev);
+  }
+  free(env);
+  gc.env.count -= 1;
 }
