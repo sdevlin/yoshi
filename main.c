@@ -12,7 +12,7 @@ struct env;
 static struct env global_env;
 static void define_primitives(struct env *env);
 
-static struct exp *read(FILE *infile);
+static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
 
@@ -28,7 +28,8 @@ static struct {
     int debug;
   } flags;
 } config;
-static FILE *next_file(FILE *curr);
+static FILE *infile;
+static FILE *next_file(void);
 
 static jmp_buf err_env;
 static const char *err_msg;
@@ -36,18 +37,17 @@ static const char *err_msg;
 static void parse_args(int argc, char **argv);
 
 int main(int argc, char **argv) {
-  FILE *infile = NULL;
   parse_args(argc, argv);
   define_primitives(&global_env);
-  infile = next_file(infile);
+  infile = next_file();
   for (;;) {
     struct exp *e;
     if (infile == stdin) {
       printf("yoshi> ");
     }
     if (!setjmp(err_env)) {
-      if ((e = read(infile)) == NULL) {
-        if ((infile = next_file(infile)) == NULL) {
+      if ((e = read()) == NULL) {
+        if ((infile = next_file()) == NULL) {
           return 0;
         } else {
           continue;
@@ -83,13 +83,13 @@ static void parse_args(int argc, char **argv) {
   }
 }
 
-static FILE *next_file(FILE *curr) {
+static FILE *next_file(void) {
   static size_t i = 0;
   if (i < config.files.count) {
     FILE *f = fopen(*(config.files.names + i), "r");
     i += 1;
     return f;
-  } else if (curr != stdin && config.flags.interactive) {
+  } else if (infile != stdin && config.flags.interactive) {
     return stdin;
   } else {
     return NULL;
@@ -155,36 +155,36 @@ static struct exp true = { CONSTANT };
 static struct exp false = { CONSTANT };
 #define FALSE (&false)
 
-static void eat_space(FILE *infile);
-static void eat_until(FILE *infile, int c);
-static struct exp *read_atom(FILE *infile);
-static struct exp *read_pair(FILE *infile);
+static void eat_space(void);
+static void eat_until(int c);
+static struct exp *read_atom(void);
+static struct exp *read_pair(void);
 static struct exp *make_atom(char *buf);
 static struct exp *make_list(struct exp *first, ...);
 
-static struct exp *read(FILE *infile) {
+static struct exp *read(void) {
   int c;
-  eat_space(infile);
+  eat_space();
   c = getc(infile);
   switch (c) {
   case EOF:
     return NULL;
   case '(':
-    return read_pair(infile);
+    return read_pair();
   case ')':
     return error("bad input");
   case '\'':
-    return make_list(make_atom("quote"), read(infile), NULL);
+    return make_list(make_atom("quote"), read(), NULL);
   case ';':
-    eat_until(infile, '\n');
-    return read(infile);
+    eat_until('\n');
+    return read();
   default:
     ungetc(c, infile);
-    return read_atom(infile);
+    return read_atom();
   }
 }
 
-static void eat_space(FILE *infile) {
+static void eat_space(void) {
   for (;;) {
     int c = getc(infile);
     if (!isspace(c)) {
@@ -194,7 +194,7 @@ static void eat_space(FILE *infile) {
   }
 }
 
-static void eat_until(FILE *infile, int c) {
+static void eat_until(int c) {
   for (;;) {
     if (c == getc(infile)) {
       return;
@@ -202,7 +202,7 @@ static void eat_until(FILE *infile, int c) {
   }
 }
 
-static struct exp *read_atom(FILE *infile) {
+static struct exp *read_atom(void) {
   size_t len = 0;
   size_t cap = 8;
   char *buf = malloc(cap);
@@ -227,17 +227,17 @@ static struct exp *read_atom(FILE *infile) {
 
 static struct exp *make_pair(void);
 
-static struct exp *read_pair(FILE *infile) {
+static struct exp *read_pair(void) {
   struct exp *pair;
   int c;
-  eat_space(infile);
+  eat_space();
   if ((c = getc(infile)) == ')') {
     return NIL;
   } else {
     ungetc(c, infile);
     pair = make_pair();
-    pair->value.pair.first = read(infile);
-    pair->value.pair.rest = read_pair(infile);
+    pair->value.pair.first = read();
+    pair->value.pair.rest = read_pair();
     return pair;
   }
 }
