@@ -323,11 +323,14 @@ static int is_apply(struct exp *exp);
 static struct exp *car(struct exp *exp);
 static struct exp *cdr(struct exp *exp);
 static struct exp *nth(struct exp *exp, size_t n);
-static struct exp *env_define(struct env *env, char *symbol,
+static struct exp *env_define(struct env *env, struct exp *symbol,
                               struct exp *value);
-static struct exp *env_lookup(struct env *env, char *symbol);
-static struct exp *env_update(struct env *env, char *symbol,
+static struct exp *env_lookup(struct env *env, struct exp *symbol);
+static struct exp *env_update(struct env *env, struct exp *symbol,
                               struct exp *value);
+static struct exp *eval_if(struct exp *if_, struct env *env);
+static struct exp *eval_and(struct exp *and, struct env *env);
+static struct exp *eval_or(struct exp *or, struct env *env);
 static struct exp *eval_begin(struct exp *begin, struct env *env);
 static struct exp *cond_to_if(struct exp *cond);
 static struct exp *make_closure(struct exp *params, struct exp *body,
@@ -343,19 +346,19 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
     return exp;
   } else if (is_var(exp)) {
-    return env_lookup(env, exp->value.symbol);
+    return env_lookup(env, exp);
   } else if (is_tagged(exp, "quote")) {
     return nth(exp, 1);
   } else if (is_tagged(exp, "set!")) {
-    return env_update(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
+    return env_update(env, nth(exp, 1), eval(nth(exp, 2), env));
   } else if (is_tagged(exp, "define")) {
-    return env_define(env, nth(exp, 1)->value.symbol, eval(nth(exp, 2), env));
+    return env_define(env, nth(exp, 1), eval(nth(exp, 2), env));
   } else if (is_tagged(exp, "if")) {
-    if (eval(nth(exp, 1), env) != FALSE) {
-      return eval(nth(exp, 2), env);
-    } else {
-      return eval(nth(exp, 3), env);
-    }
+    return eval_if(cdr(exp), env);
+  } else if (is_tagged(exp, "and")) {
+    return eval_and(cdr(exp), env);
+  } else if (is_tagged(exp, "or")) {
+    return eval_or(cdr(exp), env);
   } else if (is_tagged(exp, "lambda")) {
     return make_closure(nth(exp, 1), cdr(cdr(exp)), env);
   } else if (is_tagged(exp, "begin")) {
@@ -412,6 +415,34 @@ static struct exp *map_list(struct exp *list, struct env *env,
     new_list->value.pair.rest = map_list(cdr(list), env, fn);
     return new_list;
   }
+}
+
+static struct exp *eval_if(struct exp *if_, struct env *env) {
+  if (eval(car(if_), env) != FALSE) {
+    return eval(nth(if_, 1), env);
+  } else {
+    return eval(nth(if_, 2), env);
+  }
+}
+
+static struct exp *eval_and(struct exp *and, struct env *env) {
+  while (and != NIL) {
+    if (eval(car(and), env) == FALSE) {
+      return FALSE;
+    }
+    and = cdr(and);
+  }
+  return TRUE;
+}
+
+static struct exp *eval_or(struct exp *or, struct env *env) {
+  while (or != NIL) {
+    if (eval(car(or), env) != FALSE) {
+      return TRUE;
+    }
+    or = cdr(or);
+  }
+  return FALSE;
 }
 
 static struct exp *eval_begin(struct exp *forms, struct env *env) {
@@ -488,17 +519,22 @@ struct env {
   struct env *next;
 };
 
-static struct exp *env_visit(struct env *env, char *symbol, struct exp *value,
+static struct exp *env_visit(struct env *env,
+                             struct exp *symbol,
+                             struct exp *value,
                              struct exp *(*found)(struct binding *b,
                                                   struct exp *v),
                              struct exp *(*not_found)(struct env *env,
-                                                      char *symbol,
+                                                      struct exp *symbol,
                                                       struct exp *value)) {
   struct env *e = env;
+  if (symbol->type != SYMBOL) {
+    return error("env: expected symbol");
+  }
   do {
     struct binding *b = e->bindings;
     while (b != NULL) {
-      if (!strcmp(b->symbol, symbol)) {
+      if (!strcmp(b->symbol, symbol->value.symbol)) {
         return (*found)(b, value);
       }
       b = b->next;
@@ -508,7 +544,7 @@ static struct exp *env_visit(struct env *env, char *symbol, struct exp *value,
   return (*not_found)(env, symbol, value);
 }
 
-static struct exp *error_not_found(struct env *env, char *symbol,
+static struct exp *error_not_found(struct env *env, struct exp *symbol,
                                    struct exp *value) {
   return error("env: no binding for symbol");
 }
@@ -517,7 +553,7 @@ static struct exp *lookup_found(struct binding *binding, struct exp *_) {
   return binding->value;
 }
 
-static struct exp *env_lookup(struct env *env, char *symbol) {
+static struct exp *env_lookup(struct env *env, struct exp *symbol) {
   return env_visit(env, symbol, NULL, &lookup_found, &error_not_found);
 }
 
@@ -526,23 +562,23 @@ static struct exp *update_found(struct binding *binding, struct exp *value) {
   return OK;
 }
 
-static struct exp *env_update(struct env *env, char *symbol,
+static struct exp *env_update(struct env *env, struct exp *symbol,
                               struct exp *value) {
   return env_visit(env, symbol, value, &update_found, &error_not_found);
 }
 
-static struct exp *define_not_found(struct env *env, char *symbol,
+static struct exp *define_not_found(struct env *env, struct exp *symbol,
                                     struct exp *value) {
   struct binding *b = malloc(sizeof *b);
-  b->symbol = malloc(strlen(symbol) + 1);
-  strcpy(b->symbol, symbol);
+  b->symbol = malloc(strlen(symbol->value.symbol) + 1);
+  strcpy(b->symbol, symbol->value.symbol);
   b->value = value;
   b->next = env->bindings;
   env->bindings = b;
   return OK;
 }
 
-static struct exp *env_define(struct env *env, char *symbol,
+static struct exp *env_define(struct env *env, struct exp *symbol,
                               struct exp *value) {
   return env_visit(env, symbol, value, &update_found, &define_not_found);
 }
@@ -557,7 +593,7 @@ static struct env *extend_env(struct exp *params, struct exp *args,
   while (params != NIL) {
     // ignore non-symbol params
     if (car(params)->type == SYMBOL) {
-      env_define(env, car(params)->value.symbol, car(args));
+      env_define(env, car(params), car(args));
     }
     params = cdr(params);
     args = cdr(args);
@@ -956,7 +992,7 @@ static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = gc_alloc_exp(FUNCTION);
   e->value.function = function;
-  env_define(env, symbol, e);
+  env_define(env, make_atom(symbol), e);
 }
 
 static void define_primitives(struct env *env) {
