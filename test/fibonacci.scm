@@ -1,8 +1,10 @@
-(define fibonacci
+(define fib
   (lambda (n)
-    (define fib
+    (define iter
       (lambda (m a b)
         (if (= n m)
             b
-            (fib (+ m 1) (+ a b) a))))
-    (fib 0 1 0)))
+            (iter (+ m 1) (+ a b) a))))
+    (iter 0 1 0)))
+
+(fib 30)
