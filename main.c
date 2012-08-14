@@ -708,6 +708,11 @@ static void print(struct exp *exp) {
   }
 }
 
+static struct exp *fn_number_p(struct exp *args) {
+  ensure(list_length(args) == 1, "number? requires exactly one argument");
+  return car(args)->type == FIXNUM ? TRUE : FALSE;
+}
+
 static struct exp *fn_zero_p(struct exp *args) {
   ensure(list_length(args) == 1, "zero? requires exactly one argument");
   ensure(car(args)->type == FIXNUM, "zero? requires a numeric argument");
@@ -1008,6 +1013,7 @@ static void define_primitive(struct env *env, char *symbol,
 
 static void define_primitives(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
+  DEFUN("number?", fn_number_p);
   DEFUN("zero?", fn_zero_p);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
