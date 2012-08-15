@@ -6,7 +6,7 @@ LDFLAGS = $(FLAGS)
 all : yoshi
 
 install : yoshi
-	cp yoshi ~/bin/
+	cp yoshi $(HOME)/bin/
 
 yoshi : main.o
 	$(CC) $(LDFLAGS) main.o
