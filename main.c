@@ -18,14 +18,19 @@ static void print(struct exp *exp);
 
 static void gc_collect(void);
 
+enum flag_type {
+  OFF,
+  ON
+};
+
 static struct {
   struct {
     size_t count;
     char **names;
   } files;
   struct {
-    int interactive;
-    int debug;
+    enum flag_type interactive;
+    enum flag_type debug;
   } flags;
 } config;
 static FILE *infile;
@@ -68,9 +73,9 @@ static void parse_args(int argc, char **argv) {
   while (argc > 0) {
     char *arg = *argv;
     if (!strcmp(arg, "-i")) {
-      config.flags.interactive = 1;
+      config.flags.interactive = ON;
     } else if (!strcmp(arg, "-d")) {
-      config.flags.debug = 1;
+      config.flags.debug = ON;
     } else {
       config.files.count += 1;
       config.files.names[config.files.count - 1] = arg;
@@ -79,7 +84,7 @@ static void parse_args(int argc, char **argv) {
     argv += 1;
   }
   if (config.files.count == 0) {
-    config.flags.interactive = 1;
+    config.flags.interactive = ON;
   }
 }
 
