@@ -1086,6 +1086,9 @@ static void gc_mark_exp(struct exp *exp) {
 }
 
 static void gc_mark_env(struct env *env) {
+  if (env != &global_env && env->mark == KEEP) {
+    return;
+  }
   env->mark = KEEP;
   struct binding *b = env->bindings;
   while (b != NULL) {
