@@ -177,7 +177,7 @@ static struct exp *read(void) {
   case '(':
     return read_pair();
   case ')':
-    return error("bad input");
+    return error("extra close parenthesis");
   case '\'':
     return make_list(make_atom("quote"), read(), NULL);
   case ';':
@@ -230,20 +230,30 @@ static struct exp *read_atom(void) {
   }
 }
 
+static int symbol_eq(struct exp *exp, const char *s);
 static struct exp *make_pair(void);
 
 static struct exp *read_pair(void) {
-  struct exp *pair;
   int c;
   eat_space();
   if ((c = getc(infile)) == ')') {
     return NIL;
   } else {
     ungetc(c, infile);
-    pair = make_pair();
-    pair->value.pair.first = read();
-    pair->value.pair.rest = read_pair();
-    return pair;
+    struct exp *exp = read();
+    if (symbol_eq(exp, ".")) {
+      exp = read();
+      eat_space();
+      if (getc(infile) != ')') {
+        return error("bad dot syntax");
+      }
+      return exp;
+    } else {
+      struct exp *pair = make_pair();
+      pair->value.pair.first = exp;
+      pair->value.pair.rest = read_pair();
+      return pair;
+    }
   }
 }
 
@@ -322,7 +332,6 @@ static struct exp *make_pair(void) {
 
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
-static int symbol_eq(struct exp *exp, const char *s);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
 static struct exp *car(struct exp *exp);
