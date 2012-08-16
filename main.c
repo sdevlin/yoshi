@@ -357,7 +357,17 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_tagged(exp, "set!")) {
     return env_update(env, nth(exp, 1), eval(nth(exp, 2), env));
   } else if (is_tagged(exp, "define")) {
-    return env_define(env, nth(exp, 1), eval(nth(exp, 2), env));
+    struct exp *id = car(cdr(exp));
+    switch (id->type) {
+    case SYMBOL:
+      return env_define(env, nth(exp, 1), eval(nth(exp, 2), env));
+    case PAIR:
+      return env_define(env, car(id), make_closure(cdr(id),
+                                                   cdr(cdr(exp)),
+                                                   env));
+    default:
+      return error("define: bad syntax");
+    }
   } else if (is_tagged(exp, "if")) {
     return eval_if(cdr(exp), env);
   } else if (is_tagged(exp, "and")) {
