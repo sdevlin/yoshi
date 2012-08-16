@@ -244,7 +244,8 @@ static struct exp *read_pair(void) {
     if (symbol_eq(exp, ".")) {
       exp = read();
       eat_space();
-      if (getc(infile) != ')') {
+      if ((c = getc(infile)) != ')') {
+        ungetc(c, infile);
         return error("bad dot syntax");
       }
       return exp;
