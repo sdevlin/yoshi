@@ -3,19 +3,19 @@ FLAGS = -g -o $@
 CFLAGS = -c -Wall -Werror -pedantic -std=c99 $(FLAGS)
 LDFLAGS = $(FLAGS)
 
-all : yoshi
+all : bin/yoshi
 
-install : yoshi
-	cp yoshi $(HOME)/bin/
+install : bin/yoshi
+	cp bin/yoshi $(HOME)/bin/
 
-yoshi : main.o
+bin/yoshi : main.o
 	$(CC) $(LDFLAGS) main.o
 
 main.o : main.c
 	$(CC) $(CFLAGS) main.c
 
 clobber : clean
-	rm -f yoshi || true
+	rm -f bin/yoshi || true
 
 clean :
 	rm -f *.o || true

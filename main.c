@@ -90,7 +90,9 @@ static void parse_args(int argc, char **argv) {
 
 static FILE *next_file(void) {
   static size_t i = 0;
-  if (i < config.files.count) {
+  if (infile == NULL) {
+    return fopen("lib/libyoshi.scm", "r");
+  } else if (i < config.files.count) {
     FILE *f = fopen(*(config.files.names + i), "r");
     i += 1;
     return f;
@@ -806,12 +808,6 @@ static struct exp *fn_number_p(struct exp *args) {
   return car(args)->type == FIXNUM ? TRUE : FALSE;
 }
 
-static struct exp *fn_zero_p(struct exp *args) {
-  ensure(list_length(args) == 1, "zero? requires exactly one argument");
-  ensure(car(args)->type == FIXNUM, "zero? requires a numeric argument");
-  return car(args)->value.fixnum == 0 ? TRUE : FALSE;
-}
-
 static struct exp *fn_add(struct exp *args) {
   long acc = 0;
   ensure(list_length(args) > 0, "+ requires at least one argument");
@@ -997,18 +993,6 @@ static struct exp *fn_equal_p(struct exp *args) {
   }
 }
 
-static struct exp *fn_length(struct exp *args) {
-  ensure(list_length(args) == 1, "length requires exactly one argument");
-  args = car(args);
-  long acc = 0;
-  while (args != NIL) {
-    ensure(args->type == PAIR, "length requires a list argument");
-    acc += 1;
-    args = args->value.pair.rest;
-  }
-  return make_fixnum(acc);
-}
-
 static struct exp *fn_cons(struct exp *args) {
   ensure(list_length(args) == 2, "cons requires exactly two arguments");
   struct exp *a = nth(args, 0);
@@ -1033,58 +1017,9 @@ static struct exp *fn_cdr(struct exp *args) {
   return cdr(args);
 }
 
-static struct exp *fn_append(struct exp *args) {
-  if (list_length(args) == 0) {
-    return NIL;
-  } else if (list_length(car(args)) == 0) {
-    return fn_append(cdr(args));
-  } else {
-    struct exp *new_list = make_pair();
-    struct exp *node = new_list;
-    struct exp *old_list = car(args);
-    node->value.pair.first = car(old_list);
-    for (;;) {
-      old_list = cdr(old_list);
-      if (old_list == NIL) {
-        node->value.pair.rest = fn_append(cdr(args));
-        return new_list;
-      } else {
-        ensure(old_list->type == PAIR, "append requires list arguments");
-        node->value.pair.rest = make_pair();
-        node = node->value.pair.rest;
-        node->value.pair.first = car(old_list);
-      }
-    }
-  }
-}
-
-static struct exp *fn_list(struct exp *args) {
-  if (args == NIL) {
-    return NIL;
-  } else {
-    struct exp *list = make_pair();
-    list->value.pair.first = car(args);
-    list->value.pair.rest = fn_list(cdr(args));
-    return list;
-  }
-}
-
 static struct exp *fn_pair_p(struct exp *args) {
   ensure(list_length(args) == 1, "pair? requires exactly one argument");
   return car(args)->type == PAIR ? TRUE : FALSE;
-}
-
-static struct exp *fn_list_p(struct exp *args) {
-  ensure(list_length(args) == 1, "list? requires exactly one argument");
-  args = car(args);
-  while (args != NIL) {
-    if (args->type != PAIR) {
-      return FALSE;
-    } else {
-      args = cdr(args);
-    }
-  }
-  return TRUE;
 }
 
 static struct exp *fn_null_p(struct exp *args) {
@@ -1117,7 +1052,6 @@ static void define_primitive(struct env *env, char *symbol,
 static void define_primitives(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
   DEFUN("number?", fn_number_p);
-  DEFUN("zero?", fn_zero_p);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
@@ -1131,14 +1065,10 @@ static void define_primitives(struct env *env) {
   DEFUN("=", fn_eq);
   DEFUN("eq?", fn_eq_p);
   DEFUN("equal?", fn_equal_p);
-  DEFUN("length", fn_length);
   DEFUN("cons", fn_cons);
   DEFUN("car", fn_car);
   DEFUN("cdr", fn_cdr);
-  DEFUN("append", fn_append);
-  DEFUN("list", fn_list);
   DEFUN("pair?", fn_pair_p);
-  DEFUN("list?", fn_list_p);
   DEFUN("null?", fn_null_p);
   DEFUN("symbol?", fn_symbol_p);
   DEFUN("eval", fn_eval);
