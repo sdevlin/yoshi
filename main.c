@@ -180,6 +180,15 @@ static struct exp *read(void) {
     return error("extra close parenthesis");
   case '\'':
     return make_list(make_atom("quote"), read(), NULL);
+  case '`':
+    return make_list(make_atom("quasiquote"), read(), NULL);
+  case ',':
+    if ((c = getc(infile)) == '@') {
+      return make_list(make_atom("unquote-splicing"), read(), NULL);
+    } else {
+      ungetc(c, infile);
+      return make_list(make_atom("unquote"), read(), NULL);
+    }
   case ';':
     eat_until('\n');
     return read();
@@ -343,6 +352,7 @@ static struct exp *env_define(struct env *env, struct exp *symbol,
 static struct exp *env_lookup(struct env *env, struct exp *symbol);
 static struct exp *env_update(struct env *env, struct exp *symbol,
                               struct exp *value);
+static struct exp *eval_quasiquote(struct exp *exp, struct env *env);
 static struct exp *eval_if(struct exp *if_, struct env *env);
 static struct exp *eval_and(struct exp *and, struct env *env);
 static struct exp *eval_or(struct exp *or, struct env *env);
@@ -357,6 +367,7 @@ static struct exp *map_list(struct exp *list, struct env *env,
                             struct exp *(*fn)(struct exp *exp,
                                               struct env *env));
 
+static char *stringify(struct exp *exp);
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
     return exp;
@@ -364,6 +375,8 @@ static struct exp *eval(struct exp *exp, struct env *env) {
     return env_lookup(env, exp);
   } else if (is_tagged(exp, "quote")) {
     return nth(exp, 1);
+  } else if (is_tagged(exp, "quasiquote")) {
+    return eval_quasiquote(nth(exp, 1), env);
   } else if (is_tagged(exp, "set!")) {
     return env_update(env, nth(exp, 1), eval(nth(exp, 2), env));
   } else if (is_tagged(exp, "define")) {
@@ -439,6 +452,52 @@ static struct exp *map_list(struct exp *list, struct env *env,
     new_list->value.pair.first = (*fn)(car(list), env);
     new_list->value.pair.rest = map_list(cdr(list), env, fn);
     return new_list;
+  }
+}
+
+// the messiest, least coherent function in the whole program
+// and probably the buggiest
+// there must be a better way, but i don't know what it is
+static struct exp *eval_quasiquote(struct exp *exp, struct env *env) {
+  if (exp->type == PAIR) {
+    struct exp *list = NULL;
+    struct exp *node = NULL;
+    while (exp->type == PAIR) {
+      struct exp *item = car(exp);
+      int is_splice = 0;
+      if (is_tagged(item, "unquote")) {
+        item = eval(nth(item, 1), env);
+      } else if (is_tagged(item, "unquote-splicing")) {
+        item = eval(nth(item, 1), env);
+        is_splice = 1;
+      }
+      if (is_splice) {
+        if (node == NULL) {
+          list = node = item;
+        } else {
+          node->value.pair.rest = item;
+        }
+        while (node->value.pair.rest->type == PAIR) {
+          node = node->value.pair.rest;
+        }
+      } else {
+        if (node == NULL) {
+          list = node = make_pair();
+          node->value.pair.first = item;
+        } else {
+          node->value.pair.rest = make_pair();
+          node = node->value.pair.rest;
+          node->value.pair.first = item;
+        }
+      }
+      exp = cdr(exp);
+    }
+    if (node->value.pair.rest == NULL) {
+      node->value.pair.rest = exp;
+    }
+    return list;
+  } else {
+    return exp;
   }
 }
 
@@ -613,17 +672,26 @@ static struct env *gc_alloc_env(struct env *parent);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent) {
   struct env *env = gc_alloc_env(parent);
-  ensure(list_length(params) == list_length(args),
-         "wrong number of args in application");
-  while (params != NIL) {
-    // ignore non-symbol params
-    if (car(params)->type == SYMBOL) {
-      env_define(env, car(params), car(args));
+  for (;;) {
+    if (params == NIL && args == NIL) {
+      return env;
+    } else if (params == NIL) {
+      return error("apply: too many args");
+    } else if (params->type == PAIR) {
+      if (args == NIL) {
+        return error("apply: too few args");
+      }
+      // ignore non-symbol params
+      if (car(params)->type == SYMBOL) {
+        env_define(env, car(params), car(args));
+      }
+      params = cdr(params);
+      args = cdr(args);
+    } else if (params->type == SYMBOL) {
+      env_define(env, params, args);
+      return env;
     }
-    params = cdr(params);
-    args = cdr(args);
   }
-  return env;
 }
 
 #define CAT(str)                                \
@@ -1029,6 +1097,16 @@ static struct exp *fn_symbol_p(struct exp *args) {
   return car(args)->type == SYMBOL ? TRUE : FALSE;
 }
 
+static struct exp *fn_eval(struct exp *args) {
+  ensure(list_length(args) == 1, "eval requires exactly one argument");
+  return eval(car(args), &global_env);
+}
+
+static struct exp *fn_apply(struct exp *args) {
+  ensure(list_length(args) == 2, "apply requires exactly two arguments");
+  return apply(nth(args, 0), nth(args, 1), &global_env);
+}
+
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = gc_alloc_exp(FUNCTION);
@@ -1063,6 +1141,8 @@ static void define_primitives(struct env *env) {
   DEFUN("list?", fn_list_p);
   DEFUN("null?", fn_null_p);
   DEFUN("symbol?", fn_symbol_p);
+  DEFUN("eval", fn_eval);
+  DEFUN("apply", fn_apply);
 #undef DEFUN
 }
 
