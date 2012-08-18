@@ -968,6 +968,11 @@ static struct exp *fn_apply(struct exp *args) {
   return apply(nth(args, 0), nth(args, 1), &global_env);
 }
 
+static struct exp *fn_void(struct exp *args) {
+  ensure(list_length(args) == 0, "void requires exactly zero arguments");
+  return OK;
+}
+
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = gc_alloc_exp(FUNCTION);
@@ -993,6 +998,7 @@ static void define_primitives(struct env *env) {
   DEFUN("cdr", fn_cdr);
   DEFUN("eval", fn_eval);
   DEFUN("apply", fn_apply);
+  DEFUN("void", fn_void);
 #undef DEFUN
 }
 
