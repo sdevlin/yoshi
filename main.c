@@ -920,11 +920,6 @@ static struct exp *fn_eq(struct exp *args) {
   return TRUE;
 }
 
-static struct exp *fn_not(struct exp *args) {
-  ensure(list_length(args) == 1, "not requires exactly one argument");
-  return car(args) == FALSE ? TRUE : FALSE;
-}
-
 static struct exp *fn_eq_p(struct exp *args) {
   if (list_length(args) < 2) {
     return TRUE;
@@ -953,43 +948,6 @@ static struct exp *fn_eq_p(struct exp *args) {
       }
     }
     return fn_eq_p(cdr(args));
-  }
-}
-
-static int sexp_eq(struct exp *a, struct exp *b) {
-  if (a->type != b->type) {
-    return 0;
-  } else {
-    switch (a->type) {
-    case FIXNUM:
-      return a->value.fixnum == b->value.fixnum;
-    case SYMBOL:
-      return !strcmp(a->value.symbol, b->value.symbol);
-    case PAIR:
-      return sexp_eq(a->value.pair.first, b->value.pair.first)
-        && sexp_eq(a->value.pair.rest, b->value.pair.rest);
-    default:
-      return a == b;
-    }
-  }
-}
-
-static struct exp *fn_equal_p(struct exp *args) {
-  if (list_length(args) < 2) {
-    return TRUE;
-  } else {
-    struct exp *a = nth(args, 0);
-    struct exp *b = nth(args, 1);
-    if (a->type != b->type) {
-      return FALSE;
-    } else if (a->type == PAIR) {
-      if (!sexp_eq(a, b)) {
-        return FALSE;
-      }
-      return fn_equal_p(cdr(args));
-    } else {
-      return fn_eq_p(args);
-    }
   }
 }
 
@@ -1022,11 +980,6 @@ static struct exp *fn_pair_p(struct exp *args) {
   return car(args)->type == PAIR ? TRUE : FALSE;
 }
 
-static struct exp *fn_null_p(struct exp *args) {
-  ensure(list_length(args) == 1, "null? requires exactly one argument");
-  return car(args) == NIL ? TRUE : FALSE;
-}
-
 static struct exp *fn_symbol_p(struct exp *args) {
   ensure(list_length(args) == 1, "symbol? requires exactly one argument");
   return car(args)->type == SYMBOL ? TRUE : FALSE;
@@ -1057,19 +1010,16 @@ static void define_primitives(struct env *env) {
   DEFUN("*", fn_mul);
   DEFUN("div", fn_div);
   DEFUN("mod", fn_mod);
-  DEFUN("not", fn_not);
   DEFUN(">", fn_gt);
   DEFUN("<", fn_lt);
   DEFUN(">=", fn_ge);
   DEFUN("<=", fn_le);
   DEFUN("=", fn_eq);
   DEFUN("eq?", fn_eq_p);
-  DEFUN("equal?", fn_equal_p);
   DEFUN("cons", fn_cons);
   DEFUN("car", fn_car);
   DEFUN("cdr", fn_cdr);
   DEFUN("pair?", fn_pair_p);
-  DEFUN("null?", fn_null_p);
   DEFUN("symbol?", fn_symbol_p);
   DEFUN("eval", fn_eval);
   DEFUN("apply", fn_apply);

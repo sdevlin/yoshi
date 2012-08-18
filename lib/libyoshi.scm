@@ -1,3 +1,22 @@
+(define (not x)
+  (eq? x #f))
+
+(define (null? x)
+  (eq? x '()))
+
+(define (equal? . args)
+  (define (eql? a b)
+    (cond
+     ((and (pair? a) (pair? b))
+      (and (equal? (car a) (car b))
+           (equal? (cdr a) (cdr b))))
+     ((or (pair? a) (pair? b)) #f)
+     (else (eq? a b))))
+  (if (< (length args) 2)
+      #t
+      (and (eql? (car args) (car (cdr args)))
+           (apply equal? (cdr args)))))
+
 (define (zero? n)
   (= n 0))
 
