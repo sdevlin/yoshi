@@ -1,16 +1,30 @@
 ;; 0
 
+(define test-num 0)
+
+(define (test? exp)
+  (set! test-num (+ test-num 1))
+  (cons test-num exp))
+
 (define atom?
   (lambda (x)
     (and (not (pair? x)) (not (null? x)))))
+
+(test? (atom? 'a))
+(test? (not (atom? '())))
+(test? (not (atom? '(a))))
 
 (define add1
   (lambda (n)
     (+ n 1)))
 
+(test? (= (add1 3) 4))
+
 (define sub1
   (lambda (n)
     (- n 1)))
+
+(test? (= (sub1 4) 3))
 
 ;; 1
 
@@ -23,12 +37,18 @@
      ((atom? (car l)) (lat? (cdr l)))
      (else #f))))
 
+(test? (lat? '(Jack Sprat could eat no chicken fat)))
+(test? (not (lat? '(Jack (Sprat could) eat no chicken fat))))
+
 (define member?
   (lambda (a lat)
     (cond
      ((null? lat) #f)
      (else (or (eq? (car lat) a)
                (member? a (cdr lat)))))))
+
+(test? (member? 'meat '(mashed potatoes and meat gravy)))
+(test? (not (member? 'liver '(bagels and lox))))
 
 ;; 3
 
@@ -40,12 +60,25 @@
      (else (cons (car lat)
                  (rember a (cdr lat)))))))
 
+(test? (equal? (rember 'mint '(lamb chops and mint flavored mint jelly))
+               '(lamb chops and flavored mint jelly)))
+(test? (equal? (rember 'toast '(bacon lettuce and tomato))
+               '(bacon lettuce and tomato)))
+
 (define firsts
   (lambda (l)
     (cond
      ((null? l) '())
      (else (cons (car (car l))
                  (firsts (cdr l)))))))
+
+(test? (equal? (firsts '((apple peach pumpkin)
+                         (plum pear cherry)
+                         (grape raisin pea)
+                         (bean carrot eggplant)))
+               '(apple plum grape bean)))
+(test? (equal? (firsts '((a b) (c d) (e f)))
+               '(a c e)))
 
 (define insertR
   (lambda (new old lat)
@@ -56,6 +89,11 @@
      (else (cons (car lat)
                  (insertR new old (cdr lat)))))))
 
+(test? (equal? (insertR 'topping 'fudge '(ice cream with fudge for dessert))
+               '(ice cream with fudge topping for dessert)))
+(test? (equal? (insertR 'e 'd '(a b c d f g d h))
+               '(a b c d e f g d h)))
+
 (define insertL
   (lambda (new old lat)
     (cond
@@ -65,6 +103,9 @@
      (else (cons (car lat)
                  (insertL new old (cdr lat)))))))
 
+(test? (equal? (insertL 'topping 'fudge '(ice cream with fudge for dessert))
+               '(ice cream with topping fudge for dessert)))
+
 (define subst
   (lambda (new old lat)
     (cond
@@ -73,6 +114,9 @@
       (cons new (cdr lat)))
      (else (cons (car lat)
                  (subst new old (cdr lat)))))))
+
+(test? (equal? (subst 'topping 'fudge '(ice cream with fudge for dessert))
+               '(ice cream with topping for dessert)))
 
 (define subst2
   (lambda (new o1 o2 lat)
@@ -84,6 +128,10 @@
      (else (cons (car lat)
                  (subst2 new o1 o2 (cdr lat)))))))
 
+(test? (equal? (subst2 'vanilla 'chocolate 'banana
+                       '(banana ice cream with chocolate topping))
+               '(vanilla ice cream with chocolate topping)))
+
 (define multirember
   (lambda (a lat)
     (cond
@@ -93,6 +141,9 @@
      (else (cons (car lat)
                  (multirember a (cdr lat)))))))
 
+(test? (equal? (multirember 'cup '(coffee cup tea cup and hick cup))
+               '(coffee tea and hick)))
+
 (define multiinsertR
   (lambda (new old lat)
     (cond
@@ -100,6 +151,9 @@
      ((eq? (car lat) old)
       (cons old (cons new (multiinsertR new old (cdr lat)))))
      (else (cons (car lat) (multiinsertR new old (cdr lat)))))))
+
+(test? (equal? (multiinsertR 'chili 'cup '(coffee cup tea cup and hick cup))
+               '(coffee cup chili tea cup chili and hick cup chili)))
 
 (define multiinsertL
   (lambda (new old lat)
@@ -109,6 +163,9 @@
       (cons new (cons old (multiinsertL new old (cdr lat)))))
      (else (cons (car lat) (multiinsertL new old (cdr lat)))))))
 
+(test? (equal? (multiinsertL 'chili 'cup '(coffee cup tea cup and hick cup))
+               '(coffee chili cup tea chili cup and hick chili cup)))
+
 (define multisubst
   (lambda (new old lat)
     (cond
@@ -116,6 +173,9 @@
      ((eq? (car lat) old)
       (cons new (multisubst new old (cdr lat))))
      (else (cons (car lat) (multisubst new old (cdr lat)))))))
+
+(test? (equal? (multisubst 'chili 'cup '(coffee cup tea cup and hick cup))
+               '(coffee chili tea chili and hick chili)))
 
 ;; 4
 
@@ -125,11 +185,16 @@
      ((zero? m) n)
      (else (add1 (o+ n (sub1 m)))))))
 
+(test? (= (o+ 46 12) 58))
+
 (define o-
   (lambda (n m)
     (cond
      ((zero? m) n)
      (else (sub1 (o- n (sub1 m)))))))
+
+(test? (= (o- 14 3) 11))
+(test? (= (o- 17 9) 8))
 
 (define addtup
   (lambda (tup)
@@ -138,11 +203,17 @@
      (else (o+ (car tup)
                (addtup (cdr tup)))))))
 
+(test? (= (addtup '(3 5 2 8)) 18))
+(test? (= (addtup '(15 6 7 12 3)) 43))
+
 (define o*
   (lambda (n m)
     (cond
      ((zero? m) 0)
      (else (o+ n (o* n (sub1 m)))))))
+
+(test? (= (o* 5 3) 15))
+(test? (= (o* 13 4) 52))
 
 (define tup+
   (lambda (tup1 tup2)
@@ -150,6 +221,11 @@
      ((and (null? tup1) (null? tup2)) '())
      (else (cons (o+ (car tup1) (car tup2))
                  (tup+ (cdr tup1) (cdr tup2)))))))
+
+(test? (equal? (tup+ '(3 6 9 11 4) '(8 5 2 0 7))
+               '(11 11 11 11 11)))
+(test? (equal? (tup+ '(2 3) '(4 6))
+               '(6 9)))
 
 (define tup+
   (lambda (tup1 tup2)
@@ -159,12 +235,18 @@
      (else (cons (o+ (car tup1) (car tup2))
                  (tup+ (cdr tup1) (cdr tup2)))))))
 
+(test? (equal? (tup+ '(3 7) '(4 6 8 1))
+               '(7 13 8 1)))
+
 (define o>
   (lambda (n m)
     (cond
      ((zero? n) #f)
      ((zero? m) #t)
      (else (o> (sub1 n) (sub1 m))))))
+
+(test? (not (o> 12 133)))
+(test? (o> 120 11))
 
 (define o<
   (lambda (n m)
