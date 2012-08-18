@@ -4,6 +4,9 @@
 (define (null? x)
   (eq? x '()))
 
+(define (boolean? x)
+  (or (eq? x #t) (eq? x #f)))
+
 (define (equal? . args)
   (define (eql? a b)
     (cond
@@ -12,13 +15,21 @@
            (equal? (cdr a) (cdr b))))
      ((or (pair? a) (pair? b)) #f)
      (else (eq? a b))))
-  (if (< (length args) 2)
-      #t
+  (or (< (length args) 2)
       (and (eql? (car args) (car (cdr args)))
            (apply equal? (cdr args)))))
 
 (define (zero? n)
   (= n 0))
+
+(define (< a b)
+  (not (or (> a b) (= a b))))
+
+(define (>= a b)
+  (or (> a b) (= a b)))
+
+(define (<= a b)
+  (or (< a b) (= a b)))
 
 (define (length l)
   (cond

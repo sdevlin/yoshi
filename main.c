@@ -808,6 +808,16 @@ static struct exp *fn_number_p(struct exp *args) {
   return car(args)->type == FIXNUM ? TRUE : FALSE;
 }
 
+static struct exp *fn_pair_p(struct exp *args) {
+  ensure(list_length(args) == 1, "pair? requires exactly one argument");
+  return car(args)->type == PAIR ? TRUE : FALSE;
+}
+
+static struct exp *fn_symbol_p(struct exp *args) {
+  ensure(list_length(args) == 1, "symbol? requires exactly one argument");
+  return car(args)->type == SYMBOL ? TRUE : FALSE;
+}
+
 static struct exp *fn_add(struct exp *args) {
   long acc = 0;
   ensure(list_length(args) > 0, "+ requires at least one argument");
@@ -875,33 +885,6 @@ static struct exp *fn_gt(struct exp *args) {
   ensure(a->type == FIXNUM && b->type == FIXNUM,
          "> requires numeric arguments");
   return a->value.fixnum > b->value.fixnum ? TRUE : FALSE;
-}
-
-static struct exp *fn_lt(struct exp *args) {
-  ensure(list_length(args) == 2, "< requires exactly two arguments");
-  struct exp *a = nth(args, 0);
-  struct exp *b = nth(args, 1);
-  ensure(a->type == FIXNUM && b->type == FIXNUM,
-         "< requires numeric arguments");
-  return a->value.fixnum < b->value.fixnum ? TRUE : FALSE;
-}
-
-static struct exp *fn_ge(struct exp *args) {
-  ensure(list_length(args) == 2, ">= requires exactly two arguments");
-  struct exp *a = nth(args, 0);
-  struct exp *b = nth(args, 1);
-  ensure(a->type == FIXNUM && b->type == FIXNUM,
-         ">= requires numeric arguments");
-  return a->value.fixnum >= b->value.fixnum ? TRUE : FALSE;
-}
-
-static struct exp *fn_le(struct exp *args) {
-  ensure(list_length(args) == 2, "<= requires exactly two arguments");
-  struct exp *a = nth(args, 0);
-  struct exp *b = nth(args, 1);
-  ensure(a->type == FIXNUM && b->type == FIXNUM,
-         "<= requires numeric arguments");
-  return a->value.fixnum <= b->value.fixnum ? TRUE : FALSE;
 }
 
 static struct exp *fn_eq(struct exp *args) {
@@ -975,16 +958,6 @@ static struct exp *fn_cdr(struct exp *args) {
   return cdr(args);
 }
 
-static struct exp *fn_pair_p(struct exp *args) {
-  ensure(list_length(args) == 1, "pair? requires exactly one argument");
-  return car(args)->type == PAIR ? TRUE : FALSE;
-}
-
-static struct exp *fn_symbol_p(struct exp *args) {
-  ensure(list_length(args) == 1, "symbol? requires exactly one argument");
-  return car(args)->type == SYMBOL ? TRUE : FALSE;
-}
-
 static struct exp *fn_eval(struct exp *args) {
   ensure(list_length(args) == 1, "eval requires exactly one argument");
   return eval(car(args), &global_env);
@@ -1005,22 +978,19 @@ static void define_primitive(struct env *env, char *symbol,
 static void define_primitives(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
   DEFUN("number?", fn_number_p);
+  DEFUN("pair?", fn_pair_p);
+  DEFUN("symbol?", fn_symbol_p);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
   DEFUN("div", fn_div);
   DEFUN("mod", fn_mod);
   DEFUN(">", fn_gt);
-  DEFUN("<", fn_lt);
-  DEFUN(">=", fn_ge);
-  DEFUN("<=", fn_le);
   DEFUN("=", fn_eq);
   DEFUN("eq?", fn_eq_p);
   DEFUN("cons", fn_cons);
   DEFUN("car", fn_car);
   DEFUN("cdr", fn_cdr);
-  DEFUN("pair?", fn_pair_p);
-  DEFUN("symbol?", fn_symbol_p);
   DEFUN("eval", fn_eval);
   DEFUN("apply", fn_apply);
 #undef DEFUN
