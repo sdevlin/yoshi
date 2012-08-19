@@ -9,6 +9,7 @@
 #include "exp.h"
 #include "err.h"
 #include "gc.h"
+#include "read.h"
 #include "strbuf.h"
 
 struct exp;
@@ -17,7 +18,6 @@ struct env;
 struct env global_env;
 static void define_primitives(struct env *env);
 
-static struct exp *read(void);
 static struct exp *eval(struct exp *exp, struct env *env);
 static void print(struct exp *exp);
 
@@ -31,7 +31,7 @@ static struct {
     enum flag_type debug;
   } flags;
 } config;
-static FILE *infile;
+FILE *infile;
 static FILE *next_file(void);
 
 static void parse_args(int argc, char **argv);
@@ -98,209 +98,6 @@ static FILE *next_file(void) {
   }
 }
 
-static void eat_space(void);
-static void eat_until(int c);
-static struct exp *read_atom(void);
-static struct exp *read_pair(void);
-static struct exp *read_string(void);
-static struct exp *make_atom(char *str);
-static struct exp *make_list(struct exp *first, ...);
-
-static struct exp *read(void) {
-  int c;
-  eat_space();
-  c = getc(infile);
-  switch (c) {
-  case EOF:
-    return NULL;
-  case '(':
-    return read_pair();
-  case ')':
-    return err_error("extra close parenthesis");
-  case '"':
-    return read_string();
-  case '\'':
-    return make_list(make_atom("quote"), read(), NULL);
-  case '`':
-    return make_list(make_atom("quasiquote"), read(), NULL);
-  case ',':
-    if ((c = getc(infile)) == '@') {
-      return make_list(make_atom("unquote-splicing"), read(), NULL);
-    } else {
-      ungetc(c, infile);
-      return make_list(make_atom("unquote"), read(), NULL);
-    }
-  case ';':
-    eat_until('\n');
-    return read();
-  default:
-    ungetc(c, infile);
-    return read_atom();
-  }
-}
-
-static void eat_space(void) {
-  for (;;) {
-    int c = getc(infile);
-    if (!isspace(c)) {
-      ungetc(c, infile);
-      return;
-    }
-  }
-}
-
-static void eat_until(int c) {
-  for (;;) {
-    if (c == getc(infile)) {
-      return;
-    }
-  }
-}
-
-static struct exp *read_atom(void) {
-  struct strbuf *buf = strbuf_make(0);
-  for (;;) {
-    int c = getc(infile);
-    if (isspace(c) || c == '(' || c == ')') {
-      ungetc(c, infile);
-      char *str = strbuf_to_cstr(buf);
-      struct exp *e = make_atom(str);
-      free(str);
-      strbuf_free(buf);
-      return e;
-    } else {
-      strbuf_push(buf, c);
-    }
-  }
-}
-
-static struct exp *make_string(char *str);
-
-static struct exp *read_string(void) {
-  struct strbuf *buf = strbuf_make(0);
-  int c;
-  while ((c = getc(infile)) != '"') {
-    if (c == '\\') {
-      c = getc(infile);
-      if (c == 'n') {
-        strbuf_push(buf, '\n');
-      } else {
-        strbuf_push(buf, c);
-      }
-    } else {
-      strbuf_push(buf, c);
-    }
-  }
-  struct exp *string = make_string(strbuf_to_cstr(buf));
-  strbuf_free(buf);
-  return string;
-}
-
-static int symbol_eq(struct exp *exp, const char *s);
-static struct exp *make_pair(void);
-
-static struct exp *read_pair(void) {
-  int c;
-  eat_space();
-  if ((c = getc(infile)) == ')') {
-    return NIL;
-  } else {
-    ungetc(c, infile);
-    struct exp *exp = read();
-    if (symbol_eq(exp, ".")) {
-      exp = read();
-      eat_space();
-      if ((c = getc(infile)) != ')') {
-        ungetc(c, infile);
-        return err_error("bad dot syntax");
-      }
-      return exp;
-    } else {
-      struct exp *pair = make_pair();
-      pair->value.pair.first = exp;
-      pair->value.pair.rest = read_pair();
-      return pair;
-    }
-  }
-}
-
-static struct exp *make_string(char *str) {
-  struct exp *string = gc_alloc_exp(STRING);
-  string->value.string = str;
-  return string;
-}
-
-// refactor make_atom to use this
-static struct exp *make_fixnum(long fixnum) {
-  struct exp *e = gc_alloc_exp(FIXNUM);
-  e->value.fixnum = fixnum;
-  return e;
-}
-
-static struct exp *make_list(struct exp *first, ...) {
-  struct exp *list;
-  struct exp *node;
-  va_list args;
-  assert(first != NULL);
-  list = node = make_pair();
-  node->value.pair.first = first;
-  va_start(args, first);
-  for (;;) {
-    struct exp *next = va_arg(args, struct exp *);
-    if (next == NULL) {
-      node->value.pair.rest = NIL;
-      break;
-    } else {
-      node->value.pair.rest = make_pair();
-      node = node->value.pair.rest;
-      node->value.pair.first = next;
-    }
-  }
-  va_end(args);
-  return list;
-}
-
-static struct exp *make_atom(char *str) {
-  if (!strcmp(str, "#t")) {
-    return TRUE;
-  } else if (!strcmp(str, "#f")) {
-    return FALSE;
-  } else {
-    size_t len = strlen(str);
-    size_t i = str[0] == '-' ? 1 : 0;
-    struct exp *e = gc_alloc_exp(SYMBOL);
-    for (; i < len; i += 1) {
-      if (isdigit(str[i])) {
-        e->type = FIXNUM;
-      } else {
-        e->type = SYMBOL;
-        break;
-      }
-    }
-    switch (e->type) {
-    case SYMBOL:
-      e->value.symbol = malloc(len + 1);
-      strcpy(e->value.symbol, str);
-      break;
-    case FIXNUM:
-      // not handling overflow
-      e->value.fixnum = strtol(str, NULL, 10);
-      break;
-    default:
-      err_error("unexpected atom type");
-      break;
-    }
-    return e;
-  }
-}
-
-static struct exp *make_pair(void) {
-  struct exp *pair = gc_alloc_exp(PAIR);
-  pair->value.pair.first = NULL;
-  pair->value.pair.rest = NULL;
-  return pair;
-}
-
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
@@ -316,8 +113,6 @@ static struct exp *eval_and(struct exp *and, struct env *env);
 static struct exp *eval_or(struct exp *or, struct env *env);
 static struct exp *eval_begin(struct exp *begin, struct env *env);
 static struct exp *cond_to_if(struct exp *cond);
-static struct exp *make_closure(struct exp *params, struct exp *body,
-                                struct env *env);
 static struct exp *apply(struct exp *fn, struct exp *args, struct env *env);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
@@ -342,9 +137,9 @@ static struct exp *eval(struct exp *exp, struct env *env) {
     case SYMBOL:
       return env_define(env, exp_nth(exp, 1), eval(exp_nth(exp, 2), env));
     case PAIR:
-      return env_define(env, CAR(id), make_closure(CDR(id),
-                                                   CDR(CDR(exp)),
-                                                   env));
+      return env_define(env, CAR(id), exp_make_closure(CDR(id),
+                                                       CDR(CDR(exp)),
+                                                       env));
     default:
       return err_error("define: bad syntax");
     }
@@ -355,7 +150,7 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_tagged(exp, "or")) {
     return eval_or(CDR(exp), env);
   } else if (is_tagged(exp, "lambda")) {
-    return make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
+    return exp_make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
   } else if (is_tagged(exp, "begin")) {
     return eval_begin(CDR(exp), env);
   } else if (is_tagged(exp, "cond")) {
@@ -405,10 +200,9 @@ static struct exp *map_list(struct exp *list, struct env *env,
   if (list == NIL) {
     return NIL;
   } else {
-    struct exp *new_list = make_pair();
-    new_list->value.pair.first = (*fn)(CAR(list), env);
-    new_list->value.pair.rest = map_list(CDR(list), env, fn);
-    return new_list;
+    struct exp *first = (*fn)(CAR(list), env);
+    struct exp *rest = map_list(CDR(list), env, fn);
+    return exp_make_pair(first, rest);
   }
 }
 
@@ -439,10 +233,9 @@ static struct exp *eval_quasiquote(struct exp *exp, struct env *env) {
         }
       } else {
         if (node == NULL) {
-          list = node = make_pair();
-          node->value.pair.first = item;
+          list = node = exp_make_pair(item, NULL);
         } else {
-          node->value.pair.rest = make_pair();
+          node->value.pair.rest = exp_make_pair(NULL, NULL);
           node = node->value.pair.rest;
           node->value.pair.first = item;
         }
@@ -500,21 +293,12 @@ static struct exp *cond_to_if(struct exp *conds) {
     return OK;
   } else {
     struct exp *pred = CAR(CAR(conds));
-    return make_list(make_atom("if"),
-                     symbol_eq(pred, "else") ? TRUE : pred,
-                     exp_nth(CAR(conds), 1),
-                     cond_to_if(CDR(conds)),
-                     NULL);
+    return exp_make_list(exp_make_atom("if"),
+                         exp_symbol_eq(pred, "else") ? TRUE : pred,
+                         exp_nth(CAR(conds), 1),
+                         cond_to_if(CDR(conds)),
+                         NULL);
   }
-}
-
-static struct exp *make_closure(struct exp *params, struct exp *body,
-                                struct env *env) {
-  struct exp *e = gc_alloc_exp(CLOSURE);
-  e->value.closure.params = params;
-  e->value.closure.body = body;
-  e->value.closure.env = env;
-  return e;
 }
 
 static int is_self_eval(struct exp *exp) {
@@ -525,12 +309,8 @@ static int is_var(struct exp *exp) {
   return exp->type == SYMBOL;
 }
 
-static int symbol_eq(struct exp *exp, const char *s) {
-  return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
-}
-
 static int is_tagged(struct exp *exp, const char *s) {
-  return exp->type == PAIR && symbol_eq(exp->value.pair.first, s);
+  return exp->type == PAIR && exp_symbol_eq(exp->value.pair.first, s);
 }
 
 static int is_apply(struct exp *exp) {
@@ -669,7 +449,7 @@ static struct exp *fn_add(struct exp *args) {
     acc += e->value.fixnum;
     args = CDR(args);
   }
-  return make_fixnum(acc);
+  return exp_make_fixnum(acc);
 }
 
 static struct exp *fn_sub(struct exp *args) {
@@ -687,7 +467,7 @@ static struct exp *fn_sub(struct exp *args) {
       args = CDR(args);
     }
   }
-  return make_fixnum(acc);
+  return exp_make_fixnum(acc);
 }
 
 static struct exp *fn_mul(struct exp *args) {
@@ -699,7 +479,7 @@ static struct exp *fn_mul(struct exp *args) {
     acc *= e->value.fixnum;
     args = CDR(args);
   }
-  return make_fixnum(acc);
+  return exp_make_fixnum(acc);
 }
 
 static struct exp *fn_div(struct exp *args) {
@@ -708,7 +488,7 @@ static struct exp *fn_div(struct exp *args) {
   struct exp *b = exp_nth(args, 1);
   err_ensure(a->type == FIXNUM && b->type == FIXNUM,
              "div requires numeric arguments");
-  return make_fixnum(a->value.fixnum / b->value.fixnum);
+  return exp_make_fixnum(a->value.fixnum / b->value.fixnum);
 }
 
 static struct exp *fn_mod(struct exp *args) {
@@ -717,7 +497,7 @@ static struct exp *fn_mod(struct exp *args) {
   struct exp *b = exp_nth(args, 1);
   err_ensure(a->type == FIXNUM && b->type == FIXNUM,
              "mod requires numeric arguments");
-  return make_fixnum(a->value.fixnum % b->value.fixnum);
+  return exp_make_fixnum(a->value.fixnum % b->value.fixnum);
 }
 
 static struct exp *fn_gt(struct exp *args) {
@@ -778,12 +558,9 @@ static struct exp *fn_eq_p(struct exp *args) {
 
 static struct exp *fn_cons(struct exp *args) {
   err_ensure(list_length(args) == 2, "cons requires exactly two arguments");
-  struct exp *a = exp_nth(args, 0);
-  struct exp *b = exp_nth(args, 1);
-  struct exp *pair = make_pair();
-  pair->value.pair.first = a;
-  pair->value.pair.rest = b;
-  return pair;
+  struct exp *first = exp_nth(args, 0);
+  struct exp *rest = exp_nth(args, 1);
+  return exp_make_pair(first, rest);
 }
 
 static struct exp *fn_car(struct exp *args) {
@@ -819,7 +596,7 @@ static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = gc_alloc_exp(FUNCTION);
   e->value.function = function;
-  env_define(env, make_atom(symbol), e);
+  env_define(env, exp_make_atom(symbol), e);
 }
 
 static void define_primitives(struct env *env) {

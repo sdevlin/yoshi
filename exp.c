@@ -1,3 +1,6 @@
+#include <assert.h>
+#include <ctype.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,12 +8,101 @@
 #include "data.h"
 #include "exp.h"
 #include "err.h"
+#include "gc.h"
 #include "strbuf.h"
 
 struct exp nil = { CONSTANT };
 struct exp ok = { UNDEFINED };
 struct exp true = { CONSTANT };
 struct exp false = { CONSTANT };
+
+struct exp *exp_make_atom(char *str) {
+  if (!strcmp(str, "#t")) {
+    return TRUE;
+  } else if (!strcmp(str, "#f")) {
+    return FALSE;
+  } else {
+    size_t len = strlen(str);
+    size_t i = str[0] == '-' ? 1 : 0;
+    struct exp *e = gc_alloc_exp(SYMBOL);
+    for (; i < len; i += 1) {
+      if (isdigit(str[i])) {
+        e->type = FIXNUM;
+      } else {
+        e->type = SYMBOL;
+        break;
+      }
+    }
+    switch (e->type) {
+    case SYMBOL:
+      e->value.symbol = malloc(len + 1);
+      strcpy(e->value.symbol, str);
+      break;
+    case FIXNUM:
+      // not handling overflow
+      e->value.fixnum = strtol(str, NULL, 10);
+      break;
+    default:
+      err_error("unexpected atom type");
+      break;
+    }
+    return e;
+  }
+}
+
+struct exp *exp_make_list(struct exp *first, ...) {
+  struct exp *list;
+  struct exp *node;
+  va_list args;
+  assert(first != NULL);
+  list = node = exp_make_pair(first, NULL);
+  va_start(args, first);
+  for (;;) {
+    struct exp *next = va_arg(args, struct exp *);
+    if (next == NULL) {
+      node->value.pair.rest = NIL;
+      break;
+    } else {
+      node->value.pair.rest = exp_make_pair(next, NULL);
+      node = node->value.pair.rest;
+    }
+  }
+  va_end(args);
+  return list;
+}
+
+struct exp *exp_make_string(char *str) {
+  struct exp *string = gc_alloc_exp(STRING);
+  string->value.string = str;
+  return string;
+}
+
+struct exp *exp_make_pair(struct exp *first, struct exp *rest) {
+  struct exp *pair = gc_alloc_exp(PAIR);
+  pair->value.pair.first = first;
+  pair->value.pair.rest = rest;
+  return pair;
+}
+
+// refactor make_atom to use this
+struct exp *exp_make_fixnum(long fixnum) {
+  struct exp *e = gc_alloc_exp(FIXNUM);
+  e->value.fixnum = fixnum;
+  return e;
+}
+
+struct exp *exp_make_closure(struct exp *params, struct exp *body,
+                             struct env *env) {
+  struct exp *e = gc_alloc_exp(CLOSURE);
+  e->value.closure.params = params;
+  e->value.closure.body = body;
+  e->value.closure.env = env;
+  return e;
+}
+
+int exp_symbol_eq(struct exp *exp, const char *s) {
+  return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
+}
 
 struct exp *exp_nth(struct exp *list, size_t n) {
   return n == 0 ? CAR(list) : exp_nth(CDR(list), n - 1);
