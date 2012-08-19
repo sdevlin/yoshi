@@ -248,7 +248,16 @@ static struct exp *read_string(void) {
   struct strbuf *buf = strbuf_make(0);
   int c;
   while ((c = getc(infile)) != '"') {
-    strbuf_push(buf, c);
+    if (c == '\\') {
+      c = getc(infile);
+      if (c == 'n') {
+        strbuf_push(buf, '\n');
+      } else {
+        strbuf_push(buf, c);
+      }
+    } else {
+      strbuf_push(buf, c);
+    }
   }
   struct exp *string = make_string(strbuf_to_cstr(buf));
   strbuf_free(buf);
@@ -389,7 +398,6 @@ static struct exp *map_list(struct exp *list, struct env *env,
                             struct exp *(*fn)(struct exp *exp,
                                               struct env *env));
 
-static char *stringify(struct exp *exp);
 static struct exp *eval(struct exp *exp, struct env *env) {
   if (is_self_eval(exp)) {
     return exp;
@@ -736,9 +744,32 @@ static char *stringify(struct exp *exp) {
     strcpy(buf, exp->value.symbol);
     return buf;
   case STRING:
-    buf = malloc(strlen(exp->value.string) + 3);
-    sprintf(buf, "\"%s\"", exp->value.string);
-    return buf;
+    {
+      struct strbuf *strbuf = strbuf_make(0);
+      size_t i;
+      len = strlen(exp->value.string);
+      strbuf_push(strbuf, '"');
+      for (i = 0; i < len; i += 1) {
+        char c = exp->value.string[i];
+        switch (c) {
+        case '\n':
+          strbuf_push(strbuf, '\\');
+          strbuf_push(strbuf, 'n');
+          break;
+        case '"':
+          strbuf_push(strbuf, '\\');
+          strbuf_push(strbuf, '"');
+          break;
+        default:
+          strbuf_push(strbuf, c);
+          break;
+        }
+      }
+      strbuf_push(strbuf, '"');
+      buf = strbuf_to_cstr(strbuf);
+      strbuf_free(strbuf);
+      return buf;
+    }
   case FIXNUM:
     len = 0;
     {
