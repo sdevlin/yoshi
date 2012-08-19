@@ -1,11 +1,13 @@
 #include <assert.h>
 #include <ctype.h>
-#include <setjmp.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
+#include "data.h"
+#include "exp.h"
+#include "err.h"
 #include "strbuf.h"
 
 struct exp;
@@ -20,11 +22,6 @@ static void print(struct exp *exp);
 
 static void gc_collect(void);
 
-enum flag_type {
-  OFF,
-  ON
-};
-
 static struct {
   struct {
     size_t count;
@@ -38,9 +35,6 @@ static struct {
 static FILE *infile;
 static FILE *next_file(void);
 
-static jmp_buf err_env;
-static const char *err_msg;
-
 static void parse_args(int argc, char **argv);
 
 int main(int argc, char **argv) {
@@ -52,7 +46,7 @@ int main(int argc, char **argv) {
     if (infile == stdin) {
       printf("yoshi> ");
     }
-    if (!setjmp(err_env)) {
+    if (!err_init()) {
       if ((e = read()) == NULL) {
         if ((infile = next_file()) == NULL) {
           return 0;
@@ -105,73 +99,12 @@ static FILE *next_file(void) {
   }
 }
 
-static void *ensure(int exp, const char *msg) {
-  if (!exp) {
-    err_msg = msg;
-    longjmp(err_env, 1);
-  }
-  return NULL;
-}
-
-static void *error(const char *msg) {
-  return ensure(0, msg);
-}
-
-enum exp_type {
-  UNDEFINED,
-  PAIR,
-  FIXNUM,
-  SYMBOL,
-  STRING,
-  CLOSURE,
-  FUNCTION,
-  CONSTANT
-};
-
-enum mark_type {
-  FREE,
-  KEEP
-};
-
-struct exp {
-  enum exp_type type;
-  union {
-    struct {
-      struct exp *first;
-      struct exp *rest;
-    } pair;
-    long fixnum;
-    char *symbol;
-    char *string;
-    struct exp *(*function)(struct exp *args);
-    struct {
-      struct exp *params;
-      struct exp *body;
-      struct env *env;
-    } closure;
-  } value;
-  enum mark_type mark;
-  struct exp *next;
-};
-
-static struct exp nil = { CONSTANT };
-#define NIL (&nil)
-
-static struct exp ok = { UNDEFINED };
-#define OK (&ok)
-
-static struct exp true = { CONSTANT };
-#define TRUE (&true)
-
-static struct exp false = { CONSTANT };
-#define FALSE (&false)
-
 static void eat_space(void);
 static void eat_until(int c);
 static struct exp *read_atom(void);
 static struct exp *read_pair(void);
 static struct exp *read_string(void);
-static struct exp *make_atom(char *buf);
+static struct exp *make_atom(char *str);
 static struct exp *make_list(struct exp *first, ...);
 
 static struct exp *read(void) {
@@ -184,7 +117,7 @@ static struct exp *read(void) {
   case '(':
     return read_pair();
   case ')':
-    return error("extra close parenthesis");
+    return err_error("extra close parenthesis");
   case '"':
     return read_string();
   case '\'':
@@ -280,7 +213,7 @@ static struct exp *read_pair(void) {
       eat_space();
       if ((c = getc(infile)) != ')') {
         ungetc(c, infile);
-        return error("bad dot syntax");
+        return err_error("bad dot syntax");
       }
       return exp;
     } else {
@@ -330,17 +263,17 @@ static struct exp *make_list(struct exp *first, ...) {
   return list;
 }
 
-static struct exp *make_atom(char *buf) {
-  if (!strcmp(buf, "#t")) {
+static struct exp *make_atom(char *str) {
+  if (!strcmp(str, "#t")) {
     return TRUE;
-  } else if (!strcmp(buf, "#f")) {
+  } else if (!strcmp(str, "#f")) {
     return FALSE;
   } else {
-    size_t len = strlen(buf);
-    size_t i = buf[0] == '-' ? 1 : 0;
+    size_t len = strlen(str);
+    size_t i = str[0] == '-' ? 1 : 0;
     struct exp *e = gc_alloc_exp(SYMBOL);
     for (; i < len; i += 1) {
-      if (isdigit(buf[i])) {
+      if (isdigit(str[i])) {
         e->type = FIXNUM;
       } else {
         e->type = SYMBOL;
@@ -350,14 +283,14 @@ static struct exp *make_atom(char *buf) {
     switch (e->type) {
     case SYMBOL:
       e->value.symbol = malloc(len + 1);
-      strcpy(e->value.symbol, buf);
+      strcpy(e->value.symbol, str);
       break;
     case FIXNUM:
       // not handling overflow
-      e->value.fixnum = strtol(buf, NULL, 10);
+      e->value.fixnum = strtol(str, NULL, 10);
       break;
     default:
-      error("unexpected atom type");
+      err_error("unexpected atom type");
       break;
     }
     return e;
@@ -375,9 +308,6 @@ static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
-static struct exp *car(struct exp *exp);
-static struct exp *cdr(struct exp *exp);
-static struct exp *nth(struct exp *exp, size_t n);
 static struct exp *env_define(struct env *env, struct exp *symbol,
                               struct exp *value);
 static struct exp *env_lookup(struct env *env, struct exp *symbol);
@@ -404,41 +334,41 @@ static struct exp *eval(struct exp *exp, struct env *env) {
   } else if (is_var(exp)) {
     return env_lookup(env, exp);
   } else if (is_tagged(exp, "quote")) {
-    return nth(exp, 1);
+    return exp_nth(exp, 1);
   } else if (is_tagged(exp, "quasiquote")) {
-    return eval_quasiquote(nth(exp, 1), env);
+    return eval_quasiquote(exp_nth(exp, 1), env);
   } else if (is_tagged(exp, "set!")) {
-    return env_update(env, nth(exp, 1), eval(nth(exp, 2), env));
+    return env_update(env, exp_nth(exp, 1), eval(exp_nth(exp, 2), env));
   } else if (is_tagged(exp, "define")) {
-    struct exp *id = car(cdr(exp));
+    struct exp *id = CAR(CDR(exp));
     switch (id->type) {
     case SYMBOL:
-      return env_define(env, nth(exp, 1), eval(nth(exp, 2), env));
+      return env_define(env, exp_nth(exp, 1), eval(exp_nth(exp, 2), env));
     case PAIR:
-      return env_define(env, car(id), make_closure(cdr(id),
-                                                   cdr(cdr(exp)),
+      return env_define(env, CAR(id), make_closure(CDR(id),
+                                                   CDR(CDR(exp)),
                                                    env));
     default:
-      return error("define: bad syntax");
+      return err_error("define: bad syntax");
     }
   } else if (is_tagged(exp, "if")) {
-    return eval_if(cdr(exp), env);
+    return eval_if(CDR(exp), env);
   } else if (is_tagged(exp, "and")) {
-    return eval_and(cdr(exp), env);
+    return eval_and(CDR(exp), env);
   } else if (is_tagged(exp, "or")) {
-    return eval_or(cdr(exp), env);
+    return eval_or(CDR(exp), env);
   } else if (is_tagged(exp, "lambda")) {
-    return make_closure(nth(exp, 1), cdr(cdr(exp)), env);
+    return make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
   } else if (is_tagged(exp, "begin")) {
-    return eval_begin(cdr(exp), env);
+    return eval_begin(CDR(exp), env);
   } else if (is_tagged(exp, "cond")) {
-    return eval(cond_to_if(cdr(exp)), env);
+    return eval(cond_to_if(CDR(exp)), env);
   } else if (is_apply(exp)) {
-    struct exp *fn = eval(car(exp), env);
-    struct exp *args = map_list(cdr(exp), env, &eval);
+    struct exp *fn = eval(CAR(exp), env);
+    struct exp *args = map_list(CDR(exp), env, &eval);
     return apply(fn, args, env);
   } else {
-    return error("unknown exp type");
+    return err_error("unknown exp type");
   }
 }
 
@@ -453,20 +383,20 @@ static struct exp *apply(struct exp *fn, struct exp *args, struct env *env) {
       struct exp *exp = fn->value.closure.body;
       struct exp *result = OK;
       while (exp != NIL) {
-        result = eval(car(exp), new_env);
-        exp = cdr(exp);
+        result = eval(CAR(exp), new_env);
+        exp = CDR(exp);
       }
       return result;
     }
   default:
-    return error("apply: bad function type");
+    return err_error("apply: bad function type");
   }
 }
 
 size_t list_length(struct exp *list) {
   size_t len = 0;
   while (list != NIL) {
-    list = cdr(list);
+    list = CDR(list);
     len += 1;
   }
   return len;
@@ -479,8 +409,8 @@ static struct exp *map_list(struct exp *list, struct env *env,
     return NIL;
   } else {
     struct exp *new_list = make_pair();
-    new_list->value.pair.first = (*fn)(car(list), env);
-    new_list->value.pair.rest = map_list(cdr(list), env, fn);
+    new_list->value.pair.first = (*fn)(CAR(list), env);
+    new_list->value.pair.rest = map_list(CDR(list), env, fn);
     return new_list;
   }
 }
@@ -493,12 +423,12 @@ static struct exp *eval_quasiquote(struct exp *exp, struct env *env) {
     struct exp *list = NULL;
     struct exp *node = NULL;
     while (exp->type == PAIR) {
-      struct exp *item = car(exp);
+      struct exp *item = CAR(exp);
       int is_splice = 0;
       if (is_tagged(item, "unquote")) {
-        item = eval(nth(item, 1), env);
+        item = eval(exp_nth(item, 1), env);
       } else if (is_tagged(item, "unquote-splicing")) {
-        item = eval(nth(item, 1), env);
+        item = eval(exp_nth(item, 1), env);
         is_splice = 1;
       }
       if (is_splice) {
@@ -520,7 +450,7 @@ static struct exp *eval_quasiquote(struct exp *exp, struct env *env) {
           node->value.pair.first = item;
         }
       }
-      exp = cdr(exp);
+      exp = CDR(exp);
     }
     if (node->value.pair.rest == NULL) {
       node->value.pair.rest = exp;
@@ -532,29 +462,29 @@ static struct exp *eval_quasiquote(struct exp *exp, struct env *env) {
 }
 
 static struct exp *eval_if(struct exp *if_, struct env *env) {
-  if (eval(car(if_), env) != FALSE) {
-    return eval(nth(if_, 1), env);
+  if (eval(CAR(if_), env) != FALSE) {
+    return eval(exp_nth(if_, 1), env);
   } else {
-    return eval(nth(if_, 2), env);
+    return eval(exp_nth(if_, 2), env);
   }
 }
 
 static struct exp *eval_and(struct exp *and, struct env *env) {
   while (and != NIL) {
-    if (eval(car(and), env) == FALSE) {
+    if (eval(CAR(and), env) == FALSE) {
       return FALSE;
     }
-    and = cdr(and);
+    and = CDR(and);
   }
   return TRUE;
 }
 
 static struct exp *eval_or(struct exp *or, struct env *env) {
   while (or != NIL) {
-    if (eval(car(or), env) != FALSE) {
+    if (eval(CAR(or), env) != FALSE) {
       return TRUE;
     }
-    or = cdr(or);
+    or = CDR(or);
   }
   return FALSE;
 }
@@ -562,8 +492,8 @@ static struct exp *eval_or(struct exp *or, struct env *env) {
 static struct exp *eval_begin(struct exp *forms, struct env *env) {
   struct exp *result;
   while (forms != NIL) {
-    result = eval(car(forms), env);
-    forms = cdr(forms);
+    result = eval(CAR(forms), env);
+    forms = CDR(forms);
   }
   return result;
 }
@@ -572,11 +502,11 @@ static struct exp *cond_to_if(struct exp *conds) {
   if (conds == NIL) {
     return OK;
   } else {
-    struct exp *pred = car(car(conds));
+    struct exp *pred = CAR(CAR(conds));
     return make_list(make_atom("if"),
                      symbol_eq(pred, "else") ? TRUE : pred,
-                     nth(car(conds), 1),
-                     cond_to_if(cdr(conds)),
+                     exp_nth(CAR(conds), 1),
+                     cond_to_if(CDR(conds)),
                      NULL);
   }
 }
@@ -610,29 +540,6 @@ static int is_apply(struct exp *exp) {
   return exp->type == PAIR;
 }
 
-static struct exp *car(struct exp *exp) {
-  return exp->value.pair.first;
-}
-
-static struct exp *cdr(struct exp *exp) {
-  return exp->value.pair.rest;
-}
-
-static struct exp *nth(struct exp *exp, size_t n) {
-  return n == 0 ? car(exp) : nth(cdr(exp), n - 1);
-}
-
-struct env {
-  struct binding {
-    char *symbol;
-    struct exp *value;
-    struct binding *next;
-  } *bindings;
-  struct env *parent;
-  enum mark_type mark;
-  struct env *next;
-};
-
 static struct exp *env_visit(struct env *env,
                              struct exp *symbol,
                              struct exp *value,
@@ -643,7 +550,7 @@ static struct exp *env_visit(struct env *env,
                                                       struct exp *value)) {
   struct env *e = env;
   if (symbol->type != SYMBOL) {
-    return error("env: expected symbol");
+    return err_error("env: expected symbol");
   }
   do {
     struct binding *b = e->bindings;
@@ -660,7 +567,7 @@ static struct exp *env_visit(struct env *env,
 
 static struct exp *error_not_found(struct env *env, struct exp *symbol,
                                    struct exp *value) {
-  return error("env: no binding for symbol");
+  return err_error("env: no binding for symbol");
 }
 
 static struct exp *lookup_found(struct binding *binding, struct exp *_) {
@@ -706,17 +613,17 @@ static struct env *extend_env(struct exp *params, struct exp *args,
     if (params == NIL && args == NIL) {
       return env;
     } else if (params == NIL) {
-      return error("apply: too many args");
+      return err_error("apply: too many args");
     } else if (params->type == PAIR) {
       if (args == NIL) {
-        return error("apply: too few args");
+        return err_error("apply: too few args");
       }
       // ignore non-symbol params
-      if (car(params)->type == SYMBOL) {
-        env_define(env, car(params), car(args));
+      if (CAR(params)->type == SYMBOL) {
+        env_define(env, CAR(params), CAR(args));
       }
-      params = cdr(params);
-      args = cdr(args);
+      params = CDR(params);
+      args = CDR(args);
     } else if (params->type == SYMBOL) {
       env_define(env, params, args);
       return env;
@@ -724,133 +631,13 @@ static struct env *extend_env(struct exp *params, struct exp *args,
   }
 }
 
-#define CAT(str)                                \
-  do {                                          \
-    len += strlen(str);                         \
-    while (len + 1 > cap) {                     \
-      cap *= 2;                                 \
-    }                                           \
-    buf = realloc(buf, cap);                    \
-    strcat(buf, str);                           \
-    buf[len] = '\0';                            \
-  } while (0)
-
-static char *stringify(struct exp *exp) {
-  char *buf;
-  size_t len;
-  switch (exp->type) {
-  case SYMBOL:
-    buf = malloc(strlen(exp->value.symbol) + 1);
-    strcpy(buf, exp->value.symbol);
-    return buf;
-  case STRING:
-    {
-      struct strbuf *strbuf = strbuf_make(0);
-      size_t i;
-      len = strlen(exp->value.string);
-      strbuf_push(strbuf, '"');
-      for (i = 0; i < len; i += 1) {
-        char c = exp->value.string[i];
-        switch (c) {
-        case '\n':
-          strbuf_push(strbuf, '\\');
-          strbuf_push(strbuf, 'n');
-          break;
-        case '"':
-          strbuf_push(strbuf, '\\');
-          strbuf_push(strbuf, '"');
-          break;
-        default:
-          strbuf_push(strbuf, c);
-          break;
-        }
-      }
-      strbuf_push(strbuf, '"');
-      buf = strbuf_to_cstr(strbuf);
-      strbuf_free(strbuf);
-      return buf;
-    }
-  case FIXNUM:
-    len = 0;
-    {
-      long n = exp->value.fixnum;
-      if (n < 0) {
-        len += 1;
-      }
-      while (n != 0) {
-        len += 1;
-        n /= 10;
-      }
-    }
-    buf = malloc(len + 1);
-    sprintf(buf, "%ld", exp->value.fixnum);
-    return buf;
-  case CONSTANT:
-    buf = malloc(3);
-    if (exp == TRUE) {
-      strcpy(buf, "#t");
-    } else if (exp == FALSE) {
-      strcpy(buf, "#f");
-    } else if (exp == NIL) {
-      strcpy(buf, "()");
-    } else {
-      error("stringify: bad constant");
-    }
-    return buf;
-  case PAIR:
-    {
-      size_t cap = 1;
-      buf = malloc(cap);
-      len = 0;
-      buf[len] = '\0';
-      CAT("(");
-      for (;;) {
-        char *s = stringify(car(exp));
-        CAT(s);
-        free(s);
-        exp = exp->value.pair.rest;
-        if (exp->type == PAIR) {
-          CAT(" ");
-        } else if (exp == NIL) {
-          break;
-        } else {
-          CAT(" . ");
-          s = stringify(exp);
-          CAT(s);
-          free(s);
-          break;
-        }
-      }
-      CAT(")");
-      return buf;
-    }
-  case FUNCTION:
-    buf = malloc(13);
-    sprintf(buf, "%s", "#<function>");
-    return buf;
-  case CLOSURE:
-    buf = malloc(12);
-    sprintf(buf, "%s", "#<closure>");
-    return buf;
-  case UNDEFINED:
-    buf = malloc(13);
-    sprintf(buf, "%s", "#<undefined>");
-    return buf;
-  default:
-    printf("exp type %d\n", exp->type);
-    return error("stringify: bad exp type");
-  }
-}
-
-#undef CAT
-
 static void print(struct exp *exp) {
   switch (exp->type) {
   case UNDEFINED:
     break;
   default:
     {
-      char *str = stringify(exp);
+      char *str = exp_stringify(exp);
       printf("%s\n", str);
       free(str);
     }
@@ -859,50 +646,50 @@ static void print(struct exp *exp) {
 }
 
 static struct exp *fn_number_p(struct exp *args) {
-  ensure(list_length(args) == 1, "number? requires exactly one argument");
-  return car(args)->type == FIXNUM ? TRUE : FALSE;
+  err_ensure(list_length(args) == 1, "number? requires exactly one argument");
+  return CAR(args)->type == FIXNUM ? TRUE : FALSE;
 }
 
 static struct exp *fn_pair_p(struct exp *args) {
-  ensure(list_length(args) == 1, "pair? requires exactly one argument");
-  return car(args)->type == PAIR ? TRUE : FALSE;
+  err_ensure(list_length(args) == 1, "pair? requires exactly one argument");
+  return CAR(args)->type == PAIR ? TRUE : FALSE;
 }
 
 static struct exp *fn_symbol_p(struct exp *args) {
-  ensure(list_length(args) == 1, "symbol? requires exactly one argument");
-  return car(args)->type == SYMBOL ? TRUE : FALSE;
+  err_ensure(list_length(args) == 1, "symbol? requires exactly one argument");
+  return CAR(args)->type == SYMBOL ? TRUE : FALSE;
 }
 
 static struct exp *fn_string_p(struct exp *args) {
-  ensure(list_length(args) == 1, "string? requires exactly one argument");
-  return car(args)->type == STRING ? TRUE : FALSE;
+  err_ensure(list_length(args) == 1, "string? requires exactly one argument");
+  return CAR(args)->type == STRING ? TRUE : FALSE;
 }
 
 static struct exp *fn_add(struct exp *args) {
   long acc = 0;
-  ensure(list_length(args) > 0, "+ requires at least one argument");
+  err_ensure(list_length(args) > 0, "+ requires at least one argument");
   while (args != NIL) {
-    struct exp *e = car(args);
-    ensure(e->type == FIXNUM, "+ requires numeric arguments");
+    struct exp *e = CAR(args);
+    err_ensure(e->type == FIXNUM, "+ requires numeric arguments");
     acc += e->value.fixnum;
-    args = cdr(args);
+    args = CDR(args);
   }
   return make_fixnum(acc);
 }
 
 static struct exp *fn_sub(struct exp *args) {
   size_t len = list_length(args);
-  ensure(len > 0, "- requires at least one argument");
-  ensure(car(args)->type == FIXNUM, "- requires numeric arguments");
-  long acc = car(args)->value.fixnum;
-  args = cdr(args);
+  err_ensure(len > 0, "- requires at least one argument");
+  err_ensure(CAR(args)->type == FIXNUM, "- requires numeric arguments");
+  long acc = CAR(args)->value.fixnum;
+  args = CDR(args);
   if (len == 1) {
     acc *= -1;
   } else {
     while (args != NIL) {
-      ensure(car(args)->type == FIXNUM, "- requires numeric arguments");
-      acc -= car(args)->value.fixnum;
-      args = cdr(args);
+      err_ensure(CAR(args)->type == FIXNUM, "- requires numeric arguments");
+      acc -= CAR(args)->value.fixnum;
+      args = CDR(args);
     }
   }
   return make_fixnum(acc);
@@ -910,55 +697,55 @@ static struct exp *fn_sub(struct exp *args) {
 
 static struct exp *fn_mul(struct exp *args) {
   long acc = 1;
-  ensure(list_length(args) > 0, "* requires at least one argument");
+  err_ensure(list_length(args) > 0, "* requires at least one argument");
   while (args != NIL) {
-    struct exp *e = car(args);
-    ensure(e->type == FIXNUM, "* requires numeric arguments");
+    struct exp *e = CAR(args);
+    err_ensure(e->type == FIXNUM, "* requires numeric arguments");
     acc *= e->value.fixnum;
-    args = cdr(args);
+    args = CDR(args);
   }
   return make_fixnum(acc);
 }
 
 static struct exp *fn_div(struct exp *args) {
-  ensure(list_length(args) == 2, "div requires exactly two arguments");
-  struct exp *a = car(args);
-  struct exp *b = nth(args, 1);
-  ensure(a->type == FIXNUM && b->type == FIXNUM,
-         "div requires numeric arguments");
+  err_ensure(list_length(args) == 2, "div requires exactly two arguments");
+  struct exp *a = CAR(args);
+  struct exp *b = exp_nth(args, 1);
+  err_ensure(a->type == FIXNUM && b->type == FIXNUM,
+             "div requires numeric arguments");
   return make_fixnum(a->value.fixnum / b->value.fixnum);
 }
 
 static struct exp *fn_mod(struct exp *args) {
-  ensure(list_length(args) == 2, "mod requires exactly two arguments");
-  struct exp *a = car(args);
-  struct exp *b = nth(args, 1);
-  ensure(a->type == FIXNUM && b->type == FIXNUM,
-         "mod requires numeric arguments");
+  err_ensure(list_length(args) == 2, "mod requires exactly two arguments");
+  struct exp *a = CAR(args);
+  struct exp *b = exp_nth(args, 1);
+  err_ensure(a->type == FIXNUM && b->type == FIXNUM,
+             "mod requires numeric arguments");
   return make_fixnum(a->value.fixnum % b->value.fixnum);
 }
 
 static struct exp *fn_gt(struct exp *args) {
-  ensure(list_length(args) == 2, "> requires exactly two arguments");
-  struct exp *a = nth(args, 0);
-  struct exp *b = nth(args, 1);
-  ensure(a->type == FIXNUM && b->type == FIXNUM,
-         "> requires numeric arguments");
+  err_ensure(list_length(args) == 2, "> requires exactly two arguments");
+  struct exp *a = exp_nth(args, 0);
+  struct exp *b = exp_nth(args, 1);
+  err_ensure(a->type == FIXNUM && b->type == FIXNUM,
+             "> requires numeric arguments");
   return a->value.fixnum > b->value.fixnum ? TRUE : FALSE;
 }
 
 static struct exp *fn_eq(struct exp *args) {
   size_t len = list_length(args);
-  ensure(len >= 2, "= requires at least two arguments");
-  struct exp *first = car(args);
-  ensure(first->type == FIXNUM, "= requires numeric arguments");
-  args = cdr(args);
+  err_ensure(len >= 2, "= requires at least two arguments");
+  struct exp *first = CAR(args);
+  err_ensure(first->type == FIXNUM, "= requires numeric arguments");
+  args = CDR(args);
   while (args != NIL) {
-    ensure(car(args)->type == FIXNUM, "= requires numeric arguments");
-    if (first->value.fixnum != car(args)->value.fixnum) {
+    err_ensure(CAR(args)->type == FIXNUM, "= requires numeric arguments");
+    if (first->value.fixnum != CAR(args)->value.fixnum) {
       return FALSE;
     }
-    args = cdr(args);
+    args = CDR(args);
   }
   return TRUE;
 }
@@ -967,8 +754,8 @@ static struct exp *fn_eq_p(struct exp *args) {
   if (list_length(args) < 2) {
     return TRUE;
   } else {
-    struct exp *a = nth(args, 0);
-    struct exp *b = nth(args, 1);
+    struct exp *a = exp_nth(args, 0);
+    struct exp *b = exp_nth(args, 1);
     if (a->type != b->type) {
       return FALSE;
     } else {
@@ -990,14 +777,14 @@ static struct exp *fn_eq_p(struct exp *args) {
         break;
       }
     }
-    return fn_eq_p(cdr(args));
+    return fn_eq_p(CDR(args));
   }
 }
 
 static struct exp *fn_cons(struct exp *args) {
-  ensure(list_length(args) == 2, "cons requires exactly two arguments");
-  struct exp *a = nth(args, 0);
-  struct exp *b = nth(args, 1);
+  err_ensure(list_length(args) == 2, "cons requires exactly two arguments");
+  struct exp *a = exp_nth(args, 0);
+  struct exp *b = exp_nth(args, 1);
   struct exp *pair = make_pair();
   pair->value.pair.first = a;
   pair->value.pair.rest = b;
@@ -1005,31 +792,31 @@ static struct exp *fn_cons(struct exp *args) {
 }
 
 static struct exp *fn_car(struct exp *args) {
-  ensure(list_length(args) == 1, "car requires exactly one argument");
-  args = nth(args, 0);
-  ensure(args->type == PAIR, "car requires a pair argument");
-  return car(args);
+  err_ensure(list_length(args) == 1, "car requires exactly one argument");
+  args = exp_nth(args, 0);
+  err_ensure(args->type == PAIR, "car requires a pair argument");
+  return CAR(args);
 }
 
 static struct exp *fn_cdr(struct exp *args) {
-  ensure(list_length(args) == 1, "cdr requires exactly one argument");
-  args = nth(args, 0);
-  ensure(args->type == PAIR, "cdr requires a pair argument");
-  return cdr(args);
+  err_ensure(list_length(args) == 1, "cdr requires exactly one argument");
+  args = exp_nth(args, 0);
+  err_ensure(args->type == PAIR, "cdr requires a pair argument");
+  return CDR(args);
 }
 
 static struct exp *fn_eval(struct exp *args) {
-  ensure(list_length(args) == 1, "eval requires exactly one argument");
-  return eval(car(args), &global_env);
+  err_ensure(list_length(args) == 1, "eval requires exactly one argument");
+  return eval(CAR(args), &global_env);
 }
 
 static struct exp *fn_apply(struct exp *args) {
-  ensure(list_length(args) == 2, "apply requires exactly two arguments");
-  return apply(nth(args, 0), nth(args, 1), &global_env);
+  err_ensure(list_length(args) == 2, "apply requires exactly two arguments");
+  return apply(exp_nth(args, 0), exp_nth(args, 1), &global_env);
 }
 
 static struct exp *fn_void(struct exp *args) {
-  ensure(list_length(args) == 0, "void requires exactly zero arguments");
+  err_ensure(list_length(args) == 0, "void requires exactly zero arguments");
   return OK;
 }
 
