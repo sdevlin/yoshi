@@ -242,8 +242,17 @@ static struct exp *read_atom(void) {
   }
 }
 
+static struct exp *make_string(char *str);
+
 static struct exp *read_string(void) {
-  return NULL;
+  struct strbuf *buf = strbuf_make(0);
+  int c;
+  while ((c = getc(infile)) != '"') {
+    strbuf_push(buf, c);
+  }
+  struct exp *string = make_string(strbuf_to_cstr(buf));
+  strbuf_free(buf);
+  return string;
 }
 
 static int symbol_eq(struct exp *exp, const char *s);
@@ -275,6 +284,12 @@ static struct exp *read_pair(void) {
 }
 
 static struct exp *gc_alloc_exp(enum exp_type type);
+
+static struct exp *make_string(char *str) {
+  struct exp *string = gc_alloc_exp(STRING);
+  string->value.string = str;
+  return string;
+}
 
 // refactor make_atom to use this
 static struct exp *make_fixnum(long fixnum) {
@@ -568,7 +583,7 @@ static struct exp *make_closure(struct exp *params, struct exp *body,
 }
 
 static int is_self_eval(struct exp *exp) {
-  return exp->type == FIXNUM || exp->type == CONSTANT;
+  return exp->type == FIXNUM || exp->type == STRING || exp->type == CONSTANT;
 }
 
 static int is_var(struct exp *exp) {
@@ -720,6 +735,10 @@ static char *stringify(struct exp *exp) {
     buf = malloc(strlen(exp->value.symbol) + 1);
     strcpy(buf, exp->value.symbol);
     return buf;
+  case STRING:
+    buf = malloc(strlen(exp->value.string) + 3);
+    sprintf(buf, "\"%s\"", exp->value.string);
+    return buf;
   case FIXNUM:
     len = 0;
     {
@@ -821,6 +840,11 @@ static struct exp *fn_pair_p(struct exp *args) {
 static struct exp *fn_symbol_p(struct exp *args) {
   ensure(list_length(args) == 1, "symbol? requires exactly one argument");
   return car(args)->type == SYMBOL ? TRUE : FALSE;
+}
+
+static struct exp *fn_string_p(struct exp *args) {
+  ensure(list_length(args) == 1, "string? requires exactly one argument");
+  return car(args)->type == STRING ? TRUE : FALSE;
 }
 
 static struct exp *fn_add(struct exp *args) {
@@ -990,6 +1014,7 @@ static void define_primitives(struct env *env) {
   DEFUN("number?", fn_number_p);
   DEFUN("pair?", fn_pair_p);
   DEFUN("symbol?", fn_symbol_p);
+  DEFUN("string?", fn_string_p);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
