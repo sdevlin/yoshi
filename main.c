@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "strbuf.h"
+
 struct exp;
 struct env;
 
@@ -120,6 +122,7 @@ enum exp_type {
   PAIR,
   FIXNUM,
   SYMBOL,
+  STRING,
   CLOSURE,
   FUNCTION,
   CONSTANT
@@ -139,6 +142,7 @@ struct exp {
     } pair;
     long fixnum;
     char *symbol;
+    char *string;
     struct exp *(*function)(struct exp *args);
     struct {
       struct exp *params;
@@ -166,6 +170,7 @@ static void eat_space(void);
 static void eat_until(int c);
 static struct exp *read_atom(void);
 static struct exp *read_pair(void);
+static struct exp *read_string(void);
 static struct exp *make_atom(char *buf);
 static struct exp *make_list(struct exp *first, ...);
 
@@ -180,6 +185,8 @@ static struct exp *read(void) {
     return read_pair();
   case ')':
     return error("extra close parenthesis");
+  case '"':
+    return read_string();
   case '\'':
     return make_list(make_atom("quote"), read(), NULL);
   case '`':
@@ -219,26 +226,24 @@ static void eat_until(int c) {
 }
 
 static struct exp *read_atom(void) {
-  size_t len = 0;
-  size_t cap = 8;
-  char *buf = malloc(cap);
+  struct strbuf *buf = strbuf_make(0);
   for (;;) {
     int c = getc(infile);
     if (isspace(c) || c == '(' || c == ')') {
       ungetc(c, infile);
-      buf[len] = '\0';
-      struct exp *e = make_atom(buf);
-      free(buf);
+      char *str = strbuf_to_cstr(buf);
+      struct exp *e = make_atom(str);
+      free(str);
+      strbuf_free(buf);
       return e;
     } else {
-      if (len + 1 == cap) {
-        cap *= 2;
-        buf = realloc(buf, cap);
-      }
-      buf[len] = c;
-      len += 1;
+      strbuf_push(buf, c);
     }
   }
+}
+
+static struct exp *read_string(void) {
+  return NULL;
 }
 
 static int symbol_eq(struct exp *exp, const char *s);

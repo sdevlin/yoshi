@@ -1,0 +1,9 @@
+#ifndef STRBUF_H
+#define STRBUF_H
+struct strbuf;
+
+extern struct strbuf *strbuf_make(size_t cap);
+extern void strbuf_free(struct strbuf *buf);
+extern void strbuf_push(struct strbuf *buf, char c);
+extern char *strbuf_to_cstr(struct strbuf *buf);
+#endif
