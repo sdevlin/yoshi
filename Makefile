@@ -8,11 +8,14 @@ all : bin/yoshi
 install : bin/yoshi
 	cp bin/yoshi $(HOME)/bin/
 
-bin/yoshi : main.o exp.o err.o strbuf.o
+bin/yoshi : main.o exp.o err.o gc.o strbuf.o
 	$(CC) $(LDFLAGS) $^
 
-main.o : main.c data.h exp.h err.h strbuf.h
+main.o : main.c data.h exp.h err.h gc.h strbuf.h
 	$(CC) $(CFLAGS) main.c
+
+gc.o : gc.c gc.h data.h
+	$(CC) $(CFLAGS) gc.c
 
 exp.o : exp.c data.h exp.h err.h strbuf.h
 	$(CC) $(CFLAGS) exp.c

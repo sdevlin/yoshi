@@ -9,7 +9,7 @@ struct strbuf {
   char *buf;
 };
 
-extern struct strbuf *strbuf_make(size_t cap) {
+struct strbuf *strbuf_make(size_t cap) {
   struct strbuf *buf = malloc(sizeof *buf);
   buf->len = 0;
   buf->cap = cap > 0 ? cap : 8;
@@ -17,12 +17,12 @@ extern struct strbuf *strbuf_make(size_t cap) {
   return buf;
 }
 
-extern void strbuf_free(struct strbuf *buf) {
+void strbuf_free(struct strbuf *buf) {
   free(buf->buf);
   free(buf);
 }
 
-extern void strbuf_push(struct strbuf *buf, char c) {
+void strbuf_push(struct strbuf *buf, char c) {
   if (buf->len == buf->cap) {
     buf->cap *= 2;
     buf->buf = realloc(buf->buf, buf->cap);
@@ -31,7 +31,7 @@ extern void strbuf_push(struct strbuf *buf, char c) {
   buf->len += 1;
 }
 
-extern char *strbuf_to_cstr(struct strbuf *buf) {
+char *strbuf_to_cstr(struct strbuf *buf) {
   char *str = malloc(buf->len + 1);
   strncpy(str, buf->buf, buf->len);
   str[buf->len] = '\0';
