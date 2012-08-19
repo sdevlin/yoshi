@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "data.h"
-#include "read.h"
+#include "interp.h"
 #include "exp.h"
 #include "err.h"
 #include "strbuf.h"

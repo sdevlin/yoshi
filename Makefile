@@ -8,17 +8,23 @@ all : bin/yoshi
 install : bin/yoshi
 	cp bin/yoshi $(HOME)/bin/
 
-bin/yoshi : main.o exp.o err.o gc.o read.o strbuf.o
+bin/yoshi : main.o exp.o env.o err.o gc.o read.o interp.o libyoshi.o strbuf.o
 	$(CC) $(LDFLAGS) $^
 
-main.o : main.c data.h exp.h err.h gc.h read.h strbuf.h
+main.o : main.c data.h exp.h env.h err.h gc.h read.h interp.h libyoshi.h strbuf.h
 	$(CC) $(CFLAGS) main.c
+
+libyoshi.o : libyoshi.c libyoshi.h data.h exp.h env.h err.h gc.h
+	$(CC) $(CFLAGS) libyoshi.c
 
 gc.o : gc.c gc.h data.h
 	$(CC) $(CFLAGS) gc.c
 
 read.o : read.c read.h strbuf.h
 	$(CC) $(CFLAGS) read.c
+
+env.o : env.c env.h
+	$(CC) $(CFLAGS) env.c
 
 exp.o : exp.c data.h exp.h err.h gc.h strbuf.h
 	$(CC) $(CFLAGS) exp.c

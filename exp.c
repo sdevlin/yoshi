@@ -104,6 +104,15 @@ int exp_symbol_eq(struct exp *exp, const char *s) {
   return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
 }
 
+size_t exp_list_length(struct exp *list) {
+  size_t len = 0;
+  while (list != NIL) {
+    list = CDR(list);
+    len += 1;
+  }
+  return len;
+}
+
 struct exp *exp_nth(struct exp *list, size_t n) {
   return n == 0 ? CAR(list) : exp_nth(CDR(list), n - 1);
 }
