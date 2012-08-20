@@ -5,13 +5,14 @@ LDFLAGS = $(FLAGS)
 
 GC = gc_ms
 
-all : bin/yoshi
+debug : FLAGS += -g
+debug : bin/yoshi
 
 install : bin/yoshi
 	cp bin/yoshi $(HOME)/bin/
 
 prof : FLAGS += -pg
-prof : all
+prof : debug
 
 bin/yoshi : main.o exp.o env.o err.o $(GC).o read.o interp.o builtin.o print.o strbuf.o
 	$(CC) $(LDFLAGS) $^
@@ -52,4 +53,4 @@ clobber : clean
 clean :
 	rm -f *.o || true
 
-.PHONY : all install prof clobber clean
+.PHONY : debug install prof clobber clean
