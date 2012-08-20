@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "data.h"
 #include "exp.h"
 #include "print.h"
 

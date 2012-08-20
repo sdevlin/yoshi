@@ -1,6 +1,5 @@
 #include <string.h>
 
-#include "data.h"
 #include "exp.h"
 #include "env.h"
 #include "err.h"

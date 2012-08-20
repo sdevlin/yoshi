@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "data.h"
 #include "exp.h"
 #include "err.h"
 #include "gc.h"

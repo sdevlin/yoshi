@@ -1,6 +1,8 @@
 #include <stdlib.h>
 
-#include "data.h"
+#include "exp.h"
+#include "env.h"
+#include "flag.h"
 #include "gc.h"
 
 extern struct env global_env;

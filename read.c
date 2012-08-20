@@ -2,7 +2,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "data.h"
 #include "interp.h"
 #include "exp.h"
 #include "err.h"
