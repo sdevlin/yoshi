@@ -16,11 +16,6 @@ enum exp_type {
   CONSTANT
 };
 
-enum mark_type {
-  FREE,
-  KEEP
-};
-
 struct exp {
   enum exp_type type;
   union {
@@ -38,8 +33,6 @@ struct exp {
       struct env *env;
     } closure;
   } value;
-  enum mark_type mark;
-  struct exp *next;
 };
 
 extern struct exp nil;
@@ -61,7 +54,5 @@ struct env {
     struct binding *next;
   } *bindings;
   struct env *parent;
-  enum mark_type mark;
-  struct env *next;
 };
 #endif

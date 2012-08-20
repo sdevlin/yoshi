@@ -5,38 +5,46 @@
 
 extern struct env global_env;
 
-static struct {
-  struct {
-    struct exp root;
-    size_t count;
-  } exp;
-  struct {
-    struct env root;
-    size_t count;
-  } env;
-} gc;
+enum record_type {
+  EXP,
+  ENV
+};
 
+struct record {
+  union {
+    struct exp exp;
+    struct env env;
+  } data;
+  enum record_type type;
+  enum flag_type mark;
+  struct record *next;
+};
+
+static struct record root;
+
+
+static void gc_mark_exp(struct exp *exp);
 static void gc_mark_env(struct env *env);
 static void gc_sweep(void);
-static void gc_free_exp(struct exp *exp);
-static void gc_free_env(struct env *env);
+static void gc_free(struct record *rec);
 
 void gc_collect(void) {
   gc_mark_env(&global_env);
   gc_sweep();
-  // TODO
-  /*
-  if (config.flags.debug) {
-    printf("gc: %d exps %d envs\n", gc.exp.count, gc.env.count);
-  }
-  */
 }
 
 static void gc_mark_exp(struct exp *exp) {
-  if (exp->mark) {
-    return;
+  // this check is ugly, need a better way to filter the constants
+  // with a copying gc, it would be easy just to check if the pointer
+  // is in the bounds of managed memory
+  if (exp != OK && exp != NIL && exp != TRUE && exp != FALSE) {
+    struct record *rec = (struct record *)exp;
+    if (rec->mark) {
+      return;
+    } else {
+      rec->mark = ON;
+    }
   }
-  exp->mark = KEEP;
   switch (exp->type) {
   case PAIR:
     gc_mark_exp(exp->value.pair.first);
@@ -53,10 +61,14 @@ static void gc_mark_exp(struct exp *exp) {
 }
 
 static void gc_mark_env(struct env *env) {
-  if (env != &global_env && env->mark == KEEP) {
-    return;
+  if (env != &global_env) {
+    struct record *rec = (struct record *)env;
+    if (rec->mark) {
+      return;
+    } else {
+      rec->mark = ON;
+    }
   }
-  env->mark = KEEP;
   struct binding *b = env->bindings;
   while (b != NULL) {
     gc_mark_exp(b->value);
@@ -68,73 +80,63 @@ static void gc_mark_env(struct env *env) {
 }
 
 static void gc_sweep(void) {
-#define SWEEP(type)                              \
-  do {                                           \
-    struct type *prev = &gc.type.root;           \
-    struct type *curr = prev->next;              \
-    while (curr != NULL) {                       \
-      if (curr->mark) {                          \
-        curr->mark = FREE;                       \
-        prev = curr;                             \
-        curr = curr->next;                       \
-      } else {                                   \
-        prev->next = curr->next;                 \
-        gc_free_ ## type(curr);                  \
-        curr = prev->next;                       \
-      }                                          \
-    }                                            \
-  } while (0)
-  SWEEP(exp);
-  SWEEP(env);
-#undef SWEEP
+  struct record *prev = &root;
+  struct record *curr = prev->next;
+  while (curr != NULL) {
+    if (curr->mark) {
+      curr->mark = OFF;
+      prev = curr;
+      curr = curr->next;
+    } else {
+      prev->next = curr->next;
+      gc_free(curr);
+      curr = prev->next;
+    }
+  }
 }
 
-#define MANAGE(type)                            \
-  do {                                          \
-    e->mark = FREE;                             \
-    e->next = gc.type.root.next;                \
-    gc.type.root.next = e;                      \
-    gc.type.count += 1;                         \
-  } while (0)
+static void *gc_alloc(enum record_type type) {
+  struct record *rec = calloc(1, sizeof *rec);
+  rec->type = type;
+  rec->next = root.next;
+  root.next = rec;
+  return rec;
+}
 
 struct exp *gc_alloc_exp(enum exp_type type) {
-  struct exp *e = malloc(sizeof *e);
+  struct exp *e = gc_alloc(EXP);
   e->type = type;
-  MANAGE(exp);
   return e;
 }
 
 struct env *gc_alloc_env(struct env *parent) {
-  struct env *e = malloc(sizeof *e);
-  e->bindings = NULL;
+  struct env *e = gc_alloc(ENV);
   e->parent = parent;
-  MANAGE(env);
   return e;
 }
 
-#undef MANAGE
-
-static void gc_free_exp(struct exp *exp) {
-  switch (exp->type) {
-  case SYMBOL:
-    free(exp->value.symbol);
+static void gc_free(struct record *rec) {
+  switch (rec->type) {
+  case EXP:
+    if (rec->data.exp.type == SYMBOL) {
+      free(rec->data.exp.value.symbol);
+    }
+    break;
+  case ENV:
+    {
+      struct binding *prev = NULL;
+      struct binding *curr = rec->data.env.bindings;
+      while (curr != NULL) {
+        free(curr->symbol);
+        prev = curr;
+        curr = curr->next;
+        free(prev);
+      }
+    }
     break;
   default:
+    // error
     break;
   }
-  free(exp);
-  gc.exp.count -= 1;
-}
-
-static void gc_free_env(struct env *env) {
-  struct binding *prev = NULL;
-  struct binding *curr = env->bindings;
-  while (curr != NULL) {
-    free(curr->symbol);
-    prev = curr;
-    curr = curr->next;
-    free(prev);
-  }
-  free(env);
-  gc.env.count -= 1;
+  free(rec);
 }
