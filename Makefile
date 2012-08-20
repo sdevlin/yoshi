@@ -3,12 +3,14 @@ FLAGS = -g -o $@
 CFLAGS = -c -Wall -Werror -pedantic -std=c99 $(FLAGS)
 LDFLAGS = $(FLAGS)
 
+GC = gc_ms
+
 all : bin/yoshi
 
 install : bin/yoshi
 	cp bin/yoshi $(HOME)/bin/
 
-bin/yoshi : main.o exp.o env.o err.o gc.o read.o interp.o builtin.o print.o strbuf.o
+bin/yoshi : main.o exp.o env.o err.o $(GC).o read.o interp.o builtin.o print.o strbuf.o
 	$(CC) $(LDFLAGS) $^
 
 main.o : main.c data.h exp.h env.h err.h gc.h read.h interp.h print.h builtin.h strbuf.h
@@ -17,8 +19,8 @@ main.o : main.c data.h exp.h env.h err.h gc.h read.h interp.h print.h builtin.h 
 builtin.o : builtin.c builtin.h data.h exp.h env.h err.h gc.h
 	$(CC) $(CFLAGS) builtin.c
 
-gc.o : gc.c gc.h data.h
-	$(CC) $(CFLAGS) gc.c
+$(GC).o : $(GC).c gc.h data.h
+	$(CC) $(CFLAGS) $(GC).c
 
 print.o : print.c print.h data.h exp.h
 	$(CC) $(CFLAGS) print.c
