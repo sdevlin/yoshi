@@ -6,7 +6,7 @@
 #include "err.h"
 #include "gc.h"
 #include "interp.h"
-#include "libyoshi.h"
+#include "builtin.h"
 
 extern struct env global_env;
 
@@ -196,7 +196,7 @@ static void define_primitive(struct env *env, char *symbol,
   env_define(env, exp_make_atom(symbol), e);
 }
 
-void libyoshi_define(struct env *env) {
+void builtin_define(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
   DEFUN("number?", fn_number_p);
   DEFUN("pair?", fn_pair_p);

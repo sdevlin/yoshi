@@ -9,7 +9,7 @@
 #include "gc.h"
 #include "interp.h"
 #include "read.h"
-#include "libyoshi.h"
+#include "builtin.h"
 #include "strbuf.h"
 
 struct env global_env;
@@ -33,7 +33,7 @@ static void parse_args(int argc, char **argv);
 
 int main(int argc, char **argv) {
   parse_args(argc, argv);
-  libyoshi_define(&global_env);
+  builtin_define(&global_env);
   infile = next_file();
   for (;;) {
     struct exp *e;
