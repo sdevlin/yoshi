@@ -10,6 +10,9 @@ all : bin/yoshi
 install : bin/yoshi
 	cp bin/yoshi $(HOME)/bin/
 
+prof : FLAGS += -pg
+prof : all
+
 bin/yoshi : main.o exp.o env.o err.o $(GC).o read.o interp.o builtin.o print.o strbuf.o
 	$(CC) $(LDFLAGS) $^
 
@@ -49,4 +52,4 @@ clobber : clean
 clean :
 	rm -f *.o || true
 
-.PHONY : all install clobber clean
+.PHONY : all install prof clobber clean
