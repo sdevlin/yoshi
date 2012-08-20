@@ -10,11 +10,10 @@
 #include "interp.h"
 #include "read.h"
 #include "builtin.h"
+#include "print.h"
 #include "strbuf.h"
 
 struct env global_env;
-
-static void print(struct exp *exp);
 
 static struct {
   struct {
@@ -26,7 +25,7 @@ static struct {
     enum flag_type debug;
   } flags;
 } config;
-FILE *infile;
+static FILE *infile;
 static FILE *next_file(void);
 
 static void parse_args(int argc, char **argv);
@@ -41,7 +40,7 @@ int main(int argc, char **argv) {
       printf("yoshi> ");
     }
     if (!err_init()) {
-      if ((e = read()) == NULL) {
+      if ((e = read(infile)) == NULL) {
         if ((infile = next_file()) == NULL) {
           return 0;
         } else {
@@ -90,19 +89,5 @@ static FILE *next_file(void) {
     return stdin;
   } else {
     return NULL;
-  }
-}
-
-static void print(struct exp *exp) {
-  switch (exp->type) {
-  case UNDEFINED:
-    break;
-  default:
-    {
-      char *str = exp_stringify(exp);
-      printf("%s\n", str);
-      free(str);
-    }
-    break;
   }
 }

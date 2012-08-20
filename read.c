@@ -6,50 +6,50 @@
 #include "interp.h"
 #include "exp.h"
 #include "err.h"
+#include "read.h"
 #include "strbuf.h"
 
-extern FILE *infile;
+static void eat_space(FILE *infile);
+static void eat_until(FILE *infile, int c);
+static struct exp *read_atom(FILE *infile);
+static struct exp *read_pair(FILE *infile);
+static struct exp *read_string(FILE *infile);
 
-static void eat_space(void);
-static void eat_until(int c);
-static struct exp *read_atom(void);
-static struct exp *read_pair(void);
-static struct exp *read_string(void);
-
-struct exp *read(void) {
+struct exp *read(FILE *infile) {
   int c;
-  eat_space();
+  eat_space(infile);
   c = getc(infile);
   switch (c) {
   case EOF:
     return NULL;
   case '(':
-    return read_pair();
+    return read_pair(infile);
   case ')':
     return err_error("extra close parenthesis");
   case '"':
-    return read_string();
+    return read_string(infile);
   case '\'':
-    return exp_make_list(exp_make_atom("quote"), read(), NULL);
+    return exp_make_list(exp_make_atom("quote"), read(infile), NULL);
   case '`':
-    return exp_make_list(exp_make_atom("quasiquote"), read(), NULL);
+    return exp_make_list(exp_make_atom("quasiquote"), read(infile), NULL);
   case ',':
     if ((c = getc(infile)) == '@') {
-      return exp_make_list(exp_make_atom("unquote-splicing"), read(), NULL);
+      return exp_make_list(exp_make_atom("unquote-splicing"),
+                           read(infile), NULL);
     } else {
       ungetc(c, infile);
-      return exp_make_list(exp_make_atom("unquote"), read(), NULL);
+      return exp_make_list(exp_make_atom("unquote"), read(infile), NULL);
     }
   case ';':
-    eat_until('\n');
-    return read();
+    eat_until(infile, '\n');
+    return read(infile);
   default:
     ungetc(c, infile);
-    return read_atom();
+    return read_atom(infile);
   }
 }
 
-static void eat_space(void) {
+static void eat_space(FILE *infile) {
   for (;;) {
     int c = getc(infile);
     if (!isspace(c)) {
@@ -59,7 +59,7 @@ static void eat_space(void) {
   }
 }
 
-static void eat_until(int c) {
+static void eat_until(FILE *infile, int c) {
   for (;;) {
     if (c == getc(infile)) {
       return;
@@ -67,7 +67,7 @@ static void eat_until(int c) {
   }
 }
 
-static struct exp *read_atom(void) {
+static struct exp *read_atom(FILE *infile) {
   struct strbuf *buf = strbuf_make(0);
   for (;;) {
     int c = getc(infile);
@@ -84,29 +84,29 @@ static struct exp *read_atom(void) {
   }
 }
 
-static struct exp *read_pair(void) {
+static struct exp *read_pair(FILE *infile) {
   int c;
-  eat_space();
+  eat_space(infile);
   if ((c = getc(infile)) == ')') {
     return NIL;
   } else {
     ungetc(c, infile);
-    struct exp *exp = read();
+    struct exp *exp = read(infile);
     if (exp_symbol_eq(exp, ".")) {
-      exp = read();
-      eat_space();
+      exp = read(infile);
+      eat_space(infile);
       if ((c = getc(infile)) != ')') {
         ungetc(c, infile);
         return err_error("bad dot syntax");
       }
       return exp;
     } else {
-      return exp_make_pair(exp, read_pair());
+      return exp_make_pair(exp, read_pair(infile));
     }
   }
 }
 
-static struct exp *read_string(void) {
+static struct exp *read_string(FILE *infile) {
   struct strbuf *buf = strbuf_make(0);
   int c;
   while ((c = getc(infile)) != '"') {

@@ -8,10 +8,10 @@ all : bin/yoshi
 install : bin/yoshi
 	cp bin/yoshi $(HOME)/bin/
 
-bin/yoshi : main.o exp.o env.o err.o gc.o read.o interp.o builtin.o strbuf.o
+bin/yoshi : main.o exp.o env.o err.o gc.o read.o interp.o builtin.o print.o strbuf.o
 	$(CC) $(LDFLAGS) $^
 
-main.o : main.c data.h exp.h env.h err.h gc.h read.h interp.h builtin.h strbuf.h
+main.o : main.c data.h exp.h env.h err.h gc.h read.h interp.h print.h builtin.h strbuf.h
 	$(CC) $(CFLAGS) main.c
 
 builtin.o : builtin.c builtin.h data.h exp.h env.h err.h gc.h
@@ -20,10 +20,16 @@ builtin.o : builtin.c builtin.h data.h exp.h env.h err.h gc.h
 gc.o : gc.c gc.h data.h
 	$(CC) $(CFLAGS) gc.c
 
-read.o : read.c read.h strbuf.h
+print.o : print.c print.h data.h exp.h
+	$(CC) $(CFLAGS) print.c
+
+interp.o : interp.c interp.h data.h exp.h env.h err.h gc.h
+	$(CC) $(CFLAGS) interp.c
+
+read.o : read.c read.h strbuf.h data.h exp.h err.h
 	$(CC) $(CFLAGS) read.c
 
-env.o : env.c env.h
+env.o : env.c env.h data.h err.h
 	$(CC) $(CFLAGS) env.c
 
 exp.o : exp.c data.h exp.h err.h gc.h strbuf.h
