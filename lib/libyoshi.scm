@@ -53,7 +53,7 @@
 
 (define (map f l)
   (cond
-   ((null? l) ())
+   ((null? l) '())
    (else (cons (f (car l))
                (map f (cdr l))))))
 
