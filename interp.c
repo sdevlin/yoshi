@@ -153,19 +153,22 @@ static struct exp *eval_if(struct exp *if_, struct env *env) {
 }
 
 static struct exp *eval_and(struct exp *and, struct env *env) {
+  struct exp *result = TRUE;
   while (and != NIL) {
-    if (eval(CAR(and), env) == FALSE) {
+    result = eval(CAR(and), env);
+    if (result == FALSE) {
       return FALSE;
     }
     and = CDR(and);
   }
-  return TRUE;
+  return result;
 }
 
 static struct exp *eval_or(struct exp *or, struct env *env) {
   while (or != NIL) {
-    if (eval(CAR(or), env) != FALSE) {
-      return TRUE;
+    struct exp *result = eval(CAR(or), env);
+    if (result != FALSE) {
+      return result;
     }
     or = CDR(or);
   }
