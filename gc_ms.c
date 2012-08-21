@@ -24,7 +24,8 @@ struct record {
 
 static struct record root;
 
-
+static void gc_maybe_mark(void *ptr);
+static int gc_should_proceed(void *ptr);
 static void gc_mark_exp(struct exp *exp);
 static void gc_mark_env(struct env *env);
 static void gc_sweep(void);
@@ -36,17 +37,10 @@ void gc_collect(void) {
 }
 
 static void gc_mark_exp(struct exp *exp) {
-  // this check is ugly, need a better way to filter the constants
-  // with a copying gc, it would be easy just to check if the pointer
-  // is in the bounds of managed memory
-  if (exp != OK && exp != NIL && exp != TRUE && exp != FALSE) {
-    struct record *rec = (struct record *)exp;
-    if (rec->mark) {
-      return;
-    } else {
-      rec->mark = ON;
-    }
+  if (!gc_should_proceed(exp)) {
+    return;
   }
+  gc_maybe_mark(exp);
   switch (exp->type) {
   case PAIR:
     gc_mark_exp(exp->value.pair.first);
@@ -63,14 +57,10 @@ static void gc_mark_exp(struct exp *exp) {
 }
 
 static void gc_mark_env(struct env *env) {
-  if (env != &global_env) {
-    struct record *rec = (struct record *)env;
-    if (rec->mark) {
-      return;
-    } else {
-      rec->mark = ON;
-    }
+  if (!gc_should_proceed(env)) {
+    return;
   }
+  gc_maybe_mark(env);
   struct binding *b = env->bindings;
   while (b != NULL) {
     gc_mark_exp(b->value);
@@ -142,3 +132,31 @@ static void gc_free(struct record *rec) {
   }
   free(rec);
 }
+
+#define IS_NOT(x) (ptr != (x))
+
+static int gc_is_managed(void *ptr) {
+  return IS_NOT(&global_env) &&
+    IS_NOT(OK) &&
+    IS_NOT(NIL) &&
+    IS_NOT(TRUE) &&
+    IS_NOT(FALSE);
+}
+
+static void gc_maybe_mark(void *ptr) {
+  if (gc_is_managed(ptr)) {
+    struct record *rec = ptr;
+    rec->mark = ON;
+  }
+}
+
+static int gc_should_proceed(void *ptr) {
+  if (gc_is_managed(ptr)) {
+    struct record *rec = ptr;
+    return rec->mark == OFF;
+  } else {
+    return ptr == &global_env;
+  }
+}
+
+#undef IS_NOT
