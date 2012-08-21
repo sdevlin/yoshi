@@ -195,7 +195,7 @@ static struct exp *cond_to_if(struct exp *conds) {
 }
 
 static int is_self_eval(struct exp *exp) {
-  return exp->type == FIXNUM || exp->type == STRING || exp->type == CONSTANT;
+  return exp->type == FIXNUM || exp->type == STRING || exp->type == BOOLEAN;
 }
 
 static int is_var(struct exp *exp) {

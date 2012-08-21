@@ -3,12 +3,8 @@
 
 #include "err.h"
 
-static jmp_buf err_env;
+jmp_buf err_env;
 const char *err_msg;
-
-int err_init(void) {
-  return setjmp(err_env);
-}
 
 void *err_ensure(int test, const char *msg) {
   if (!test) {

@@ -4,11 +4,12 @@ enum exp_type {
   UNDEFINED,
   PAIR,
   FIXNUM,
+  BOOLEAN,
   SYMBOL,
   STRING,
   CLOSURE,
   FUNCTION,
-  CONSTANT
+  NIL_TYPE
 };
 
 struct exp {

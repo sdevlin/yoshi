@@ -80,7 +80,7 @@ static void parse_args(int argc, char **argv) {
 static FILE *next_file(void) {
   static size_t i = 0;
   if (infile == NULL) {
-    return fopen("lib/libyoshi.scm", "r");
+    return fopen("/home/sean/proj/yoshi/lib/libyoshi.scm", "r");
   } else if (i < config.files.count) {
     FILE *f = fopen(*(config.files.names + i), "r");
     i += 1;

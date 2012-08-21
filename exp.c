@@ -10,10 +10,10 @@
 #include "gc.h"
 #include "strbuf.h"
 
-struct exp nil = { CONSTANT };
+struct exp nil = { NIL_TYPE };
 struct exp ok = { UNDEFINED };
-struct exp true = { CONSTANT };
-struct exp false = { CONSTANT };
+struct exp true = { BOOLEAN };
+struct exp false = { BOOLEAN };
 
 struct exp *exp_make_atom(char *str) {
   if (!strcmp(str, "#t")) {
@@ -177,13 +177,19 @@ char *exp_stringify(struct exp *exp) {
     str = malloc(len + 1);
     sprintf(str, "%ld", exp->value.fixnum);
     return str;
-  case CONSTANT:
+  case BOOLEAN:
     str = malloc(3);
     if (exp == TRUE) {
       strcpy(str, "#t");
     } else if (exp == FALSE) {
       strcpy(str, "#f");
-    } else if (exp == NIL) {
+    } else {
+      err_error("exp_stringify: bad boolean");
+    }
+    return str;
+  case NIL_TYPE:
+    str = malloc(3);
+    if (exp == NIL) {
       strcpy(str, "()");
     } else {
       err_error("exp_stringify: bad constant");
