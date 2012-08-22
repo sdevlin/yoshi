@@ -176,7 +176,7 @@ static struct exp *eval_or(struct exp *or, struct env *env) {
 }
 
 static struct exp *eval_begin(struct exp *forms, struct env *env) {
-  struct exp *result;
+  struct exp *result = OK;
   while (forms != NIL) {
     result = eval(CAR(forms), env);
     forms = CDR(forms);
