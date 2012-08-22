@@ -1,5 +1,5 @@
 CC = gcc
-FLAGS = -g -o $@
+FLAGS = -o $@
 CFLAGS = -c -Wall -Werror -pedantic -std=c99 $(FLAGS)
 LDFLAGS = $(FLAGS)
 
@@ -8,7 +8,10 @@ GC = gc_ms
 debug : FLAGS += -g
 debug : bin/yoshi
 
-install : bin/yoshi
+release : FLAGS += -O3
+release : bin/yoshi
+
+install : release
 	cp bin/yoshi $(HOME)/bin/
 
 prof : FLAGS += -pg
@@ -53,4 +56,4 @@ clobber : clean
 clean :
 	rm -f *.o || true
 
-.PHONY : debug install prof clobber clean
+.PHONY : debug release install prof clobber clean
