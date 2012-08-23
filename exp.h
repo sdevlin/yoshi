@@ -7,6 +7,7 @@ enum exp_type {
   BOOLEAN,
   SYMBOL,
   STRING,
+  VECTOR,
   CLOSURE,
   FUNCTION,
   NIL_TYPE
@@ -22,6 +23,10 @@ struct exp {
     long fixnum;
     char *symbol;
     char *string;
+    struct {
+      size_t len;
+      struct exp **items;
+    } vector;
     struct exp *(*function)(struct exp *args);
     struct {
       struct exp *params;

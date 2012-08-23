@@ -13,6 +13,7 @@ static void eat_until(FILE *infile, int c);
 static struct exp *read_atom(FILE *infile);
 static struct exp *read_pair(FILE *infile);
 static struct exp *read_string(FILE *infile);
+static struct exp *read_hash(FILE *infile);
 
 struct exp *read(FILE *infile) {
   int c;
@@ -27,6 +28,8 @@ struct exp *read(FILE *infile) {
     return err_error("extra close parenthesis");
   case '"':
     return read_string(infile);
+  case '#':
+    return read_hash(infile);
   case '\'':
     return exp_make_list(exp_make_atom("quote"), read(infile), NULL);
   case '`':
@@ -123,4 +126,32 @@ static struct exp *read_string(FILE *infile) {
   struct exp *string = exp_make_string(strbuf_to_cstr(buf));
   strbuf_free(buf);
   return string;
+}
+
+static struct exp *read_vector(FILE *infile) {
+  int c;
+  while ((c = getc(infile)) != ')') {
+
+  }
+  return NIL;
+}
+
+static struct exp *read_char(FILE *infile) {
+  return NIL;
+}
+
+static struct exp *read_hash(FILE *infile) {
+  int c = getc(infile);
+  switch (c) {
+  case '(':
+    return read_vector(infile);
+  case '\\':
+    return read_char(infile);
+  case 't':
+    return TRUE;
+  case 'f':
+    return FALSE;
+  default:
+    return err_error("bad syntax in #");
+  }
 }

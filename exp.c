@@ -222,6 +222,10 @@ char *exp_stringify(struct exp *exp) {
       CAT(")");
       return str;
     }
+  case VECTOR:
+    str = malloc(3);
+    sprintf(str, "%s", "#()");
+    return str;
   case FUNCTION:
     str = malloc(13);
     sprintf(str, "%s", "#<function>");
