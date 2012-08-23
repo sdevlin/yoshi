@@ -223,9 +223,25 @@ char *exp_stringify(struct exp *exp) {
       return str;
     }
   case VECTOR:
-    str = malloc(3);
-    sprintf(str, "%s", "#()");
-    return str;
+    {
+      size_t i;
+      size_t cap = 1;
+      str = malloc(cap);
+      len = 0;
+      str[len] = '\0';
+      CAT("#(");
+      for (i = 0; i < exp->value.vector.len; i += 1) {
+        char *s;
+        if (i > 0) {
+          CAT(" ");
+        }
+        s = exp_stringify(*(exp->value.vector.items + i));
+        CAT(s);
+        free(s);
+      }
+      CAT(")");
+      return str;
+    }
   case FUNCTION:
     str = malloc(13);
     sprintf(str, "%s", "#<function>");
