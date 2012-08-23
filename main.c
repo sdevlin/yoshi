@@ -3,7 +3,6 @@
 #include <string.h>
 
 #include "flag.h"
-#include "exp.h"
 #include "env.h"
 #include "err.h"
 #include "gc.h"

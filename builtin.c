@@ -3,7 +3,7 @@
 #include "exp.h"
 #include "env.h"
 #include "err.h"
-#include "gc.h"
+#include "alloc.h"
 #include "interp.h"
 #include "builtin.h"
 
@@ -188,7 +188,7 @@ static struct exp *fn_void(struct exp *args) {
 
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
-  struct exp *e = gc_alloc_exp(FUNCTION);
+  struct exp *e = alloc_exp(FUNCTION);
   e->value.function = function;
   env_define(env, exp_make_atom(symbol), e);
 }

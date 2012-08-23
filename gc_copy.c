@@ -1,18 +1,17 @@
 #include <stdlib.h>
 
-#include "data.h"
+#include "exp.h"
 #include "gc.h"
-
-extern struct env global_env;
+#include "alloc.h"
 
 void gc_collect(void) {
 
 }
 
-struct exp *gc_alloc_exp(enum exp_type type) {
+struct exp *alloc_exp(enum exp_type type) {
   return NULL;
 }
 
-struct env *gc_alloc_env(struct env *parent) {
+struct env *alloc_env(struct env *parent) {
   return NULL;
 }
