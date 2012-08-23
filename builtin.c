@@ -171,24 +171,6 @@ static struct exp *fn_cdr(struct exp *args) {
   return CDR(args);
 }
 
-static struct exp *fn_set_car(struct exp *args) {
-  err_ensure(exp_list_length(args) == 2,
-             "set-car! requires exactly two arugments");
-  struct exp *pair = exp_nth(args, 0);
-  err_ensure(pair->type == PAIR, "set-car! requires a pair argument");
-  pair->value.pair.first = exp_nth(args, 1);
-  return OK;
-}
-
-static struct exp *fn_set_cdr(struct exp *args) {
-  err_ensure(exp_list_length(args) == 2,
-             "set-cdr! requires exactly two arugments");
-  struct exp *pair = exp_nth(args, 0);
-  err_ensure(pair->type == PAIR, "set-cdr! requires a pair argument");
-  pair->value.pair.rest = exp_nth(args, 1);
-  return OK;
-}
-
 static struct exp *fn_eval(struct exp *args) {
   err_ensure(exp_list_length(args) == 1, "eval requires exactly one argument");
   return eval(CAR(args), &global_env);
@@ -230,8 +212,6 @@ void builtin_define(struct env *env) {
   DEFUN("cons", fn_cons);
   DEFUN("car", fn_car);
   DEFUN("cdr", fn_cdr);
-  DEFUN("set-car!", fn_set_car);
-  DEFUN("set-cdr!", fn_set_cdr);
   DEFUN("eval", fn_eval);
   DEFUN("apply", fn_apply);
   DEFUN("void", fn_void);
