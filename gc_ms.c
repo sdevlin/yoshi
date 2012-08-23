@@ -5,8 +5,6 @@
 #include "flag.h"
 #include "gc.h"
 
-extern struct env global_env;
-
 enum record_type {
   EXP,
   ENV

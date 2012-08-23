@@ -7,8 +7,6 @@
 #include "interp.h"
 #include "builtin.h"
 
-extern struct env global_env;
-
 static struct exp *fn_number_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "number? requires exactly one argument");

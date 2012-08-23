@@ -9,6 +9,8 @@ struct env {
   struct env *parent;
 };
 
+extern struct env global_env;
+
 extern struct exp *env_define(struct env *env, struct exp *symbol,
                               struct exp *value);
 extern struct exp *env_lookup(struct env *env, struct exp *symbol);
