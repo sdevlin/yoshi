@@ -2,7 +2,6 @@
 #include <stdlib.h>
 
 #include "exp.h"
-#include "print.h"
 
 void print(struct exp *exp) {
   switch (exp->type) {

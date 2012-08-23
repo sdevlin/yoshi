@@ -2,15 +2,14 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "flag.h"
 #include "env.h"
-#include "err.h"
-#include "gc.h"
-#include "interp.h"
-#include "read.h"
+#include "flag.h"
 #include "builtin.h"
+#include "err.h"
+#include "read.h"
 #include "print.h"
-#include "strbuf.h"
+#include "interp.h"
+#include "gc.h"
 
 struct env global_env;
 

@@ -2,10 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "interp.h"
 #include "exp.h"
 #include "err.h"
-#include "read.h"
 #include "strbuf.h"
 
 static void eat_space(FILE *infile);

@@ -3,8 +3,6 @@
 #include "exp.h"
 #include "env.h"
 #include "flag.h"
-#include "gc.h"
-#include "alloc.h"
 
 enum record_type {
   EXP,
@@ -86,7 +84,7 @@ static void gc_sweep(void) {
   }
 }
 
-static void *alloc(enum record_type type) {
+static void *gc_alloc(enum record_type type) {
   struct record *rec = calloc(1, sizeof *rec);
   rec->type = type;
   rec->next = root.next;
@@ -94,14 +92,14 @@ static void *alloc(enum record_type type) {
   return rec;
 }
 
-struct exp *alloc_exp(enum exp_type type) {
-  struct exp *e = alloc(EXP);
+struct exp *gc_alloc_exp(enum exp_type type) {
+  struct exp *e = gc_alloc(EXP);
   e->type = type;
   return e;
 }
 
-struct env *alloc_env(struct env *parent) {
-  struct env *e = alloc(ENV);
+struct env *gc_alloc_env(struct env *parent) {
+  struct env *e = gc_alloc(ENV);
   e->parent = parent;
   return e;
 }

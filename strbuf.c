@@ -1,8 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "strbuf.h"
-
 struct strbuf {
   size_t len;
   size_t cap;

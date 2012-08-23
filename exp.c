@@ -7,7 +7,7 @@
 
 #include "exp.h"
 #include "err.h"
-#include "alloc.h"
+#include "gc_alloc.h"
 #include "strbuf.h"
 
 struct exp nil = { NIL_TYPE };
@@ -23,7 +23,7 @@ struct exp *exp_make_atom(char *str) {
   } else {
     size_t len = strlen(str);
     size_t i = str[0] == '-' ? 1 : 0;
-    struct exp *e = alloc_exp(SYMBOL);
+    struct exp *e = gc_alloc_exp(SYMBOL);
     for (; i < len; i += 1) {
       if (isdigit(str[i])) {
         e->type = FIXNUM;
@@ -71,13 +71,13 @@ struct exp *exp_make_list(struct exp *first, ...) {
 }
 
 struct exp *exp_make_string(char *str) {
-  struct exp *string = alloc_exp(STRING);
+  struct exp *string = gc_alloc_exp(STRING);
   string->value.string = str;
   return string;
 }
 
 struct exp *exp_make_pair(struct exp *first, struct exp *rest) {
-  struct exp *pair = alloc_exp(PAIR);
+  struct exp *pair = gc_alloc_exp(PAIR);
   pair->value.pair.first = first;
   pair->value.pair.rest = rest;
   return pair;
@@ -85,14 +85,14 @@ struct exp *exp_make_pair(struct exp *first, struct exp *rest) {
 
 // refactor make_atom to use this
 struct exp *exp_make_fixnum(long fixnum) {
-  struct exp *e = alloc_exp(FIXNUM);
+  struct exp *e = gc_alloc_exp(FIXNUM);
   e->value.fixnum = fixnum;
   return e;
 }
 
 struct exp *exp_make_closure(struct exp *params, struct exp *body,
                              struct env *env) {
-  struct exp *e = alloc_exp(CLOSURE);
+  struct exp *e = gc_alloc_exp(CLOSURE);
   e->value.closure.params = params;
   e->value.closure.body = body;
   e->value.closure.env = env;
