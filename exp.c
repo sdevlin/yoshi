@@ -15,7 +15,7 @@ struct exp ok = { UNDEFINED };
 struct exp true = { BOOLEAN };
 struct exp false = { BOOLEAN };
 
-struct exp *exp_make_atom(char *str) {
+struct exp *exp_make_atom(const char *str) {
   if (!strcmp(str, "#t")) {
     return TRUE;
   } else if (!strcmp(str, "#f")) {
@@ -23,30 +23,32 @@ struct exp *exp_make_atom(char *str) {
   } else {
     size_t len = strlen(str);
     size_t i = str[0] == '-' ? 1 : 0;
-    struct exp *e = gc_alloc_exp(SYMBOL);
+    enum exp_type type = SYMBOL;
     for (; i < len; i += 1) {
       if (isdigit(str[i])) {
-        e->type = FIXNUM;
+        type = FIXNUM;
       } else {
-        e->type = SYMBOL;
+        type = SYMBOL;
         break;
       }
     }
-    switch (e->type) {
+    switch (type) {
     case SYMBOL:
-      e->value.symbol = malloc(len + 1);
-      strcpy(e->value.symbol, str);
-      break;
+      return exp_make_symbol(str);
     case FIXNUM:
       // not handling overflow
-      e->value.fixnum = strtol(str, NULL, 10);
-      break;
+      return exp_make_fixnum(strtol(str, NULL, 10));
     default:
-      err_error("unexpected atom type");
-      break;
+      return err_error("unexpected atom type");
     }
-    return e;
   }
+}
+
+struct exp *exp_make_symbol(const char *sym) {
+  struct exp *symbol = gc_alloc_exp(SYMBOL);
+  symbol->value.symbol = malloc(strlen(sym) + 1);
+  strcpy(symbol->value.symbol, sym);
+  return symbol;
 }
 
 struct exp *exp_make_list(struct exp *first, ...) {
@@ -68,6 +70,21 @@ struct exp *exp_make_list(struct exp *first, ...) {
   }
   va_end(args);
   return list;
+}
+
+struct exp *exp_make_vector(size_t len, ...) {
+  va_list args;
+  size_t i;
+  struct exp *vector = gc_alloc_exp(VECTOR);
+  vector->value.vector.len = len;
+  vector->value.vector.items = malloc(len *
+                                      (sizeof *vector->value.vector.items));
+  va_start(args, len);
+  for (i = 0; i < len; i += 1) {
+    *(vector->value.vector.items + i) = va_arg(args, struct exp *);
+  }
+  va_end(args);
+  return vector;
 }
 
 struct exp *exp_make_string(char *str) {

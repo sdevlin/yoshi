@@ -48,8 +48,10 @@ extern struct exp true;
 extern struct exp false;
 #define FALSE (&false)
 
-extern struct exp *exp_make_atom(char *str);
+extern struct exp *exp_make_atom(const char *str);
+extern struct exp *exp_make_symbol(const char *sym);
 extern struct exp *exp_make_list(struct exp *first, ...);
+extern struct exp *exp_make_vector(size_t len, ...);
 extern struct exp *exp_make_string(char *str);
 extern struct exp *exp_make_pair(struct exp *first, struct exp *rest);
 extern struct exp *exp_make_fixnum(long fixnum);

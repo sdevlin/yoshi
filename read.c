@@ -127,11 +127,14 @@ static struct exp *read_string(FILE *infile) {
 }
 
 static struct exp *read_vector(FILE *infile) {
+  struct exp *vector = exp_make_vector(0);
   int c;
   while ((c = getc(infile)) != ')') {
+    ungetc(c, infile);
+    // struct exp *item = read(infile);
 
   }
-  return NIL;
+  return vector;
 }
 
 static struct exp *read_char(FILE *infile) {
