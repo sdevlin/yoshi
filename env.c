@@ -53,18 +53,24 @@ struct exp *env_update(struct env *env, struct exp *symbol,
   return env_visit(env, symbol, value, &update_found, &error_not_found);
 }
 
-static struct exp *define_not_found(struct env *env, struct exp *symbol,
-                                    struct exp *value) {
-  struct binding *b = malloc(sizeof *b);
+struct exp *env_define(struct env *env, struct exp *symbol,
+                       struct exp *value) {
+  if (symbol->type != SYMBOL) {
+    return err_error("env: expected symbol");
+  }
+  struct binding *b = env->bindings;
+  while (b != NULL) {
+    if (!strcmp(b->symbol, symbol->value.symbol)) {
+      b->value = value;
+      return OK;
+    }
+    b = b->next;
+  }
+  b = malloc(sizeof *b);
   b->symbol = malloc(strlen(symbol->value.symbol) + 1);
   strcpy(b->symbol, symbol->value.symbol);
   b->value = value;
   b->next = env->bindings;
   env->bindings = b;
   return OK;
-}
-
-struct exp *env_define(struct env *env, struct exp *symbol,
-                              struct exp *value) {
-  return env_visit(env, symbol, value, &update_found, &define_not_found);
 }
