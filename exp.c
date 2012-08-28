@@ -100,7 +100,6 @@ struct exp *exp_make_pair(struct exp *first, struct exp *rest) {
   return pair;
 }
 
-// refactor make_atom to use this
 struct exp *exp_make_fixnum(long fixnum) {
   struct exp *e = gc_alloc_exp(FIXNUM);
   e->value.fixnum = fixnum;
@@ -114,6 +113,27 @@ struct exp *exp_make_closure(struct exp *params, struct exp *body,
   e->value.closure.body = body;
   e->value.closure.env = env;
   return e;
+}
+
+struct exp *exp_copy(struct exp *exp) {
+  assert(exp != NULL);
+  switch (exp->type) {
+  case UNDEFINED:
+  case BOOLEAN:
+  case NIL_TYPE:
+    return exp;
+  case PAIR:
+    return exp_make_pair(exp_copy(exp->value.pair.first),
+                         exp_copy(exp->value.pair.rest));
+  case FIXNUM:
+    return exp_make_fixnum(exp->value.fixnum);
+  case SYMBOL:
+    return exp_make_symbol(exp->value.symbol);
+  case STRING:
+    return exp_make_string(exp->value.string);
+  default:
+    return err_error("unsupported type for copying");
+  }
 }
 
 int exp_symbol_eq(struct exp *exp, const char *s) {

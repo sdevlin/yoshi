@@ -58,6 +58,7 @@ extern struct exp *exp_make_fixnum(long fixnum);
 struct env;
 extern struct exp *exp_make_closure(struct exp *params, struct exp *body,
                                     struct env *env);
+extern struct exp *exp_copy(struct exp *exp);
 extern int exp_symbol_eq(struct exp *exp, const char *s);
 extern size_t exp_list_length(struct exp *list);
 #define CAR(exp) (exp->value.pair.first)

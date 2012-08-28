@@ -13,6 +13,7 @@ static int is_apply(struct exp *exp);
 static struct exp *eval_quasiquote(struct exp *exp, struct env *env);
 static struct exp *eval_and(struct exp *and, struct env *env);
 static struct exp *eval_or(struct exp *or, struct env *env);
+static struct exp *expand_begin(struct exp *begin);
 static struct exp *expand_cond(struct exp *cond);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
@@ -57,18 +58,9 @@ struct exp *eval(struct exp *exp, struct env *env) {
     } else if (is_tagged(exp, "lambda")) {
       return exp_make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
     } else if (is_tagged(exp, "begin")) {
-      exp = CDR(exp);
-      if (exp == NIL) {
-        return OK;
-      } else {
-        while (CDR(exp) != NIL) {
-          eval(CAR(exp), env);
-          exp = CDR(exp);
-        }
-        exp = CAR(exp);
-      }
+      exp = expand_begin(CDR(exp));
     } else if (is_tagged(exp, "cond")) {
-      return eval(expand_cond(CDR(exp)), env);
+      exp = expand_cond(CDR(exp));
     } else if (is_apply(exp)) {
       struct exp *fn;
       struct exp *args;
@@ -81,10 +73,16 @@ struct exp *eval(struct exp *exp, struct env *env) {
       case CLOSURE:
         env = extend_env(fn->value.closure.params, args,
                          fn->value.closure.env);
-        // wrapping the body in a begin is very slow
-        // need some better way to do this
-        exp = exp_make_pair(exp_make_symbol("begin"),
-                            fn->value.closure.body);
+        exp = fn->value.closure.body;
+        if (exp == NIL) {
+          return OK;
+        } else {
+          while (CDR(exp) != NIL) {
+            eval(CAR(exp), env);
+            exp = CDR(exp);
+          }
+          exp = CAR(exp);
+        }
         break;
       default:
         return err_error("eval: bad function type");
@@ -194,6 +192,15 @@ static struct exp *eval_or(struct exp *or, struct env *env) {
     or = CDR(or);
   }
   return FALSE;
+}
+
+static struct exp *expand_begin(struct exp *forms) {
+  struct exp *lambda;
+  lambda = exp_make_list(exp_make_symbol("lambda"),
+                         NIL,
+                         NULL);
+  CDR(lambda)->value.pair.rest = exp_copy(forms);
+  return exp_make_list(lambda, NULL);
 }
 
 static struct exp *expand_cond(struct exp *conds) {
