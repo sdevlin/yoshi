@@ -5,67 +5,57 @@
 #include "env.h"
 #include "err.h"
 
-static struct exp *env_visit(struct env *env,
-                             struct exp *symbol,
-                             struct exp *value,
-                             struct exp *(*found)(struct binding *b,
-                                                  struct exp *v),
-                             struct exp *(*not_found)(struct env *env,
-                                                      struct exp *symbol,
-                                                      struct exp *value)) {
-  struct env *e = env;
-  if (symbol->type != SYMBOL) {
-    return err_error("env: expected symbol");
+#define FOREACH_ENV(code)                       \
+  do {                                          \
+    { code; }                                   \
+    env = env->parent;                          \
+  } while (env != NULL);
+#define FOREACH_BINDING(code)                   \
+  struct binding *b = env->bindings;            \
+  while (b != NULL) {                           \
+    { code; }                                   \
+    b = b->next;                                \
   }
-  do {
-    struct binding *b = e->bindings;
-    while (b != NULL) {
-      if (!strcmp(b->symbol, symbol->value.symbol)) {
-        return (*found)(b, value);
-      }
-      b = b->next;
-    }
-    e = e->parent;
-  } while (e != NULL);
-  return (*not_found)(env, symbol, value);
-}
+#define IF_FOUND(code)                                  \
+  if (!strcmp(b->symbol, symbol->value.symbol)) {       \
+    code;                                               \
+  }
 
-static struct exp *error_not_found(struct env *env, struct exp *symbol,
-                                   struct exp *value) {
+struct exp *env_lookup(struct env *env, struct exp *symbol) {
+  err_ensure(symbol->type == SYMBOL, "env: expected symbol");
+  FOREACH_ENV({
+      FOREACH_BINDING({
+          IF_FOUND({
+              return b->value;
+            });
+        });
+    });
   return err_error("env: no binding for symbol");
 }
 
-static struct exp *lookup_found(struct binding *binding, struct exp *_) {
-  return binding->value;
-}
-
-struct exp *env_lookup(struct env *env, struct exp *symbol) {
-  return env_visit(env, symbol, NULL, &lookup_found, &error_not_found);
-}
-
-static struct exp *update_found(struct binding *binding, struct exp *value) {
-  binding->value = value;
-  return OK;
-}
-
 struct exp *env_update(struct env *env, struct exp *symbol,
-                              struct exp *value) {
-  return env_visit(env, symbol, value, &update_found, &error_not_found);
+                       struct exp *value) {
+  err_ensure(symbol->type == SYMBOL, "env: expected symbol");
+  FOREACH_ENV({
+      FOREACH_BINDING({
+          IF_FOUND({
+              b->value = value;
+              return OK;
+            });
+        });
+    });
+  return err_error("env: no binding for symbol");
 }
 
 struct exp *env_define(struct env *env, struct exp *symbol,
                        struct exp *value) {
-  if (symbol->type != SYMBOL) {
-    return err_error("env: expected symbol");
-  }
-  struct binding *b = env->bindings;
-  while (b != NULL) {
-    if (!strcmp(b->symbol, symbol->value.symbol)) {
-      b->value = value;
-      return OK;
-    }
-    b = b->next;
-  }
+  err_ensure(symbol->type == SYMBOL, "env: expected symbol");
+  FOREACH_BINDING({
+      IF_FOUND({
+          b->value = value;
+          return OK;
+        });
+    });
   b = malloc(sizeof *b);
   b->symbol = malloc(strlen(symbol->value.symbol) + 1);
   strcpy(b->symbol, symbol->value.symbol);
