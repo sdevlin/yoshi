@@ -10,10 +10,10 @@
 #include "gc_alloc.h"
 #include "strbuf.h"
 
-struct exp nil = { NIL_TYPE };
-struct exp ok = { UNDEFINED };
-struct exp true = { BOOLEAN };
-struct exp false = { BOOLEAN };
+struct exp nil = { .type = NIL_TYPE };
+struct exp ok = { .type = UNDEFINED };
+struct exp true = { .type = BOOLEAN };
+struct exp false = { .type = BOOLEAN };
 
 struct exp *exp_make_atom(const char *str) {
   if (!strcmp(str, "#t")) {
