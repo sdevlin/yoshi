@@ -3,7 +3,7 @@ FLAGS = -o $@
 CFLAGS = -c -Wall -Werror -pedantic -std=c99 $(FLAGS)
 LDFLAGS = $(FLAGS)
 
-GC = gc_null
+GC = gc_ms
 
 debug : FLAGS += -g
 debug : bin/yoshi
@@ -29,8 +29,8 @@ builtin.o : builtin.c builtin.h exp.h env.h err.h gc.h
 gc_ms.o : gc_ms.c exp.h env.h flag.h
 	$(CC) $(CFLAGS) gc_ms.c
 
-gc_null.o : gc_null.c exp.h env.h
-	$(CC) $(CFLAGS) gc_null.c
+gc_nop.o : gc_nop.c exp.h env.h
+	$(CC) $(CFLAGS) gc_nop.c
 
 print.o : print.c exp.h
 	$(CC) $(CFLAGS) print.c
