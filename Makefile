@@ -1,63 +1,34 @@
 CC = gcc
-FLAGS = -o $@
-CFLAGS = -c -Wall -Werror -pedantic -std=c99 $(FLAGS)
-LDFLAGS = $(FLAGS)
+CFLAGS = -Wall -Werror -pedantic -std=c99
 
-GC = gc_ms
+TARGET = bin/yoshi
 
-dev : FLAGS += -g
-dev : bin/yoshi
+GC_IMP = src/gc_ms.c
 
-prof : FLAGS += -pg
-prof : debug
+SOURCES = $(filter-out src/gc_%.c, $(wildcard src/**/*.c src/*.c))
+SOURCES += $(GC_IMP)
+OBJECTS = $(patsubst %.c,%.o,$(SOURCES))
 
-release : FLAGS += -O3
-release : bin/yoshi
+dev : CFLAGS += -g
+dev : $(TARGET)
+
+prof : CFLAGS += -pg
+prof : dev
+
+release : CFLAGS += -O3
+release : $(TARGET)
 
 install : release
-	install bin/yoshi $(HOME)/bin/
+	install $(TARGET) $(HOME)/bin/
 
-bin/yoshi : main.o exp.o env.o err.o $(GC).o read.o interp.o builtin.o print.o strbuf.o
+$(TARGET) : $(OBJECTS)
 	@mkdir -p bin
-	$(CC) $(LDFLAGS) $^
-
-main.o : main.c flag.h env.h err.h gc.h read.h interp.h print.h builtin.h
-	$(CC) $(CFLAGS) main.c
-
-builtin.o : builtin.c builtin.h exp.h env.h err.h gc.h
-	$(CC) $(CFLAGS) builtin.c
-
-gc_ms.o : gc_ms.c exp.h env.h flag.h
-	$(CC) $(CFLAGS) gc_ms.c
-
-gc_nop.o : gc_nop.c exp.h env.h
-	$(CC) $(CFLAGS) gc_nop.c
-
-print.o : print.c exp.h
-	$(CC) $(CFLAGS) print.c
-
-interp.o : interp.c interp.h exp.h env.h err.h gc_alloc.h
-	$(CC) $(CFLAGS) interp.c
-
-read.o : read.c strbuf.h exp.h err.h
-	$(CC) $(CFLAGS) read.c
-
-env.o : env.c env.h exp.h err.h
-	$(CC) $(CFLAGS) env.c
-
-exp.o : exp.c exp.h err.h gc_alloc.h strbuf.h
-	$(CC) $(CFLAGS) exp.c
-
-err.o : err.c err.h
-	$(CC) $(CFLAGS) err.c
-
-strbuf.o : strbuf.c
-	$(CC) $(CFLAGS) strbuf.c
+	$(CC) $(LDFLAGS) -o $(TARGET) $^
 
 clobber : clean
-	rm -f bin/yoshi || true
+	rm -f $(TARGET) || true
 
 clean :
-	rm -f *.o || true
+	rm -f $(OBJECTS) || true
 
 .PHONY : debug prof release install clobber clean
