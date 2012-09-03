@@ -5,8 +5,8 @@ LDFLAGS = $(FLAGS)
 
 GC = gc_ms
 
-debug : FLAGS += -g
-debug : bin/yoshi
+dev : FLAGS += -g
+dev : bin/yoshi
 
 prof : FLAGS += -pg
 prof : debug
@@ -15,9 +15,10 @@ release : FLAGS += -O3
 release : bin/yoshi
 
 install : release
-	cp bin/yoshi $(HOME)/bin/
+	install bin/yoshi $(HOME)/bin/
 
 bin/yoshi : main.o exp.o env.o err.o $(GC).o read.o interp.o builtin.o print.o strbuf.o
+	@mkdir -p bin
 	$(CC) $(LDFLAGS) $^
 
 main.o : main.c flag.h env.h err.h gc.h read.h interp.h print.h builtin.h
