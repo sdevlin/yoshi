@@ -75,10 +75,14 @@ static void parse_args(int argc, char **argv) {
   }
 }
 
+#ifndef PREFIX
+#define PREFIX "."
+#endif
+
 static FILE *next_file(void) {
   static size_t i = 0;
   if (infile == NULL) {
-    return fopen("/home/sean/proj/yoshi/lib/libyoshi.scm", "r");
+    return fopen(PREFIX "/lib/yoshi/stdlib.scm", "r");
   } else if (i < config.files.count) {
     FILE *f = fopen(*(config.files.names + i), "r");
     i += 1;
