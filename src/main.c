@@ -32,7 +32,10 @@ int main(int argc, char **argv) {
           continue;
         }
       }
-      print(eval(e, &global_env));
+      e = eval(e, &global_env);
+      if (!config.silent) {
+        print(e);
+      }
     } else {
       printf("error: %s\n", err_msg);
     }
