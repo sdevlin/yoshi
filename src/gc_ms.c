@@ -2,11 +2,15 @@
 
 #include "exp.h"
 #include "env.h"
-#include "flag.h"
 
 enum record_type {
   EXP,
   ENV
+};
+
+enum mark_type {
+  FREE,
+  KEEP
 };
 
 struct record {
@@ -15,7 +19,7 @@ struct record {
     struct env env;
   } data;
   enum record_type type;
-  enum flag_type mark;
+  enum mark_type mark;
   struct record *next;
 };
 
@@ -73,7 +77,7 @@ static void gc_sweep(void) {
   struct record *curr = prev->next;
   while (curr != NULL) {
     if (curr->mark) {
-      curr->mark = OFF;
+      curr->mark = FREE;
       prev = curr;
       curr = curr->next;
     } else {
@@ -143,14 +147,14 @@ static int gc_is_managed(void *ptr) {
 static void gc_maybe_mark(void *ptr) {
   if (gc_is_managed(ptr)) {
     struct record *rec = ptr;
-    rec->mark = ON;
+    rec->mark = KEEP;
   }
 }
 
 static int gc_should_proceed(void *ptr) {
   if (gc_is_managed(ptr)) {
     struct record *rec = ptr;
-    return rec->mark == OFF;
+    return rec->mark == FREE;
   } else {
     return ptr == &global_env;
   }

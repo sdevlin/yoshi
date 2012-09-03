@@ -23,7 +23,7 @@ install : release
 
 $(TARGET) : $(OBJECTS)
 	@mkdir -p bin
-	$(CC) $(LDFLAGS) -o $(TARGET) $^
+	$(CC) $(CFLAGS) -o $(TARGET) $^
 
 clobber : clean
 	rm -f $(TARGET) || true
