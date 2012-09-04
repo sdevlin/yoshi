@@ -8,34 +8,34 @@ GC_IMP = src/gc_ms.c
 SOURCES = $(filter-out src/gc_%.c, $(wildcard src/**/*.c src/*.c))
 SOURCES += $(GC_IMP)
 OBJECTS = $(SOURCES:.c=.o)
-DEPENDENCIES = $(SOURCES:.c=.d)
+DEPENDS = $(SOURCES:.c=.d)
 
-dev : CFLAGS += -g
-dev : $(TARGET)
+dev: CFLAGS += -g
+dev: $(TARGET)
 
-prof : CFLAGS += -pg
-prof : dev
+prof: CFLAGS += -pg
+prof: dev
 
-release : CFLAGS += -O3
-release : $(TARGET)
+release: CFLAGS += -O3
+release: $(TARGET)
 
-install : release
+install: release
 	install $(TARGET) $(HOME)/bin/
 
-$(TARGET) : $(OBJECTS)
+$(TARGET): $(OBJECTS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) $^ -o $(TARGET)
 
--include $(DEPENDENCIES)
+-include $(DEPENDS)
 
-%.o : %.c
+%.o: %.c
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
 	@$(CC) $(CFLAGS) -MM $*.c >$*.d
 
-clobber : clean
+clobber: clean
 	rm -f $(TARGET) || true
 
-clean :
-	rm -f $(OBJECTS) $(DEPENDENCIES) || true
+clean:
+	rm -f $(OBJECTS) $(DEPENDS) || true
 
-.PHONY : dev prof release install clobber clean
+.PHONY: dev prof release install clobber clean
