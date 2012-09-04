@@ -2,4 +2,4 @@ vectors
 chars
 ports
 bignum?
-add silent flag
+makefile generated dependencies has bug because deps are in subdir
