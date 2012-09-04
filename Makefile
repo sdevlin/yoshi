@@ -7,7 +7,8 @@ GC_IMP = src/gc_ms.c
 
 SOURCES = $(filter-out src/gc_%.c, $(wildcard src/**/*.c src/*.c))
 SOURCES += $(GC_IMP)
-OBJECTS = $(patsubst %.c,%.o,$(SOURCES))
+OBJECTS = $(SOURCES:.c=.o)
+DEPENDENCIES = $(SOURCES:.c=.d)
 
 dev : CFLAGS += -g
 dev : $(TARGET)
@@ -23,12 +24,18 @@ install : release
 
 $(TARGET) : $(OBJECTS)
 	@mkdir -p bin
-	$(CC) $(CFLAGS) -o $(TARGET) $^
+	$(CC) $(CFLAGS) $^ -o $(TARGET)
+
+-include $(DEPENDENCIES)
+
+%.o : %.c
+	$(CC) $(CFLAGS) -c $*.c -o $*.o
+	@$(CC) $(CFLAGS) -MM $*.c >$*.d
 
 clobber : clean
 	rm -f $(TARGET) || true
 
 clean :
-	rm -f $(OBJECTS) || true
+	rm -f $(OBJECTS) $(DEPENDENCIES) || true
 
-.PHONY : debug prof release install clobber clean
+.PHONY : dev prof release install clobber clean
