@@ -31,6 +31,10 @@ $(TARGET): $(OBJECTS)
 %.o: %.c
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
 	@$(CC) $(CFLAGS) -MM $*.c >$*.d
+	@mv -f $*.d $*.d.tmp
+	@sed -e 's|.*:|$*.o:|' <$*.d.tmp >$*.d
+	@sed -e 's/.*://' -e 's/\\$$//' <$*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >>$*.d
+	@rm -f $*.d.tmp
 
 clobber: clean
 	rm -f $(TARGET) || true
