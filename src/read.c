@@ -5,6 +5,7 @@
 #include "exp.h"
 #include "err.h"
 #include "strbuf.h"
+#include "util/vector.h"
 
 static void eat_space(FILE *infile);
 static void eat_until(FILE *infile, int c);
@@ -129,10 +130,11 @@ static struct exp *read_string(FILE *infile) {
 static struct exp *read_vector(FILE *infile) {
   struct exp *vector = exp_make_vector(0);
   int c;
+  eat_space(infile);
   while ((c = getc(infile)) != ')') {
     ungetc(c, infile);
-    // struct exp *item = read(infile);
-
+    vector_push(vector->value.vector, read(infile));
+    eat_space(infile);
   }
   return vector;
 }

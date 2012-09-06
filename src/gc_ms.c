@@ -2,6 +2,7 @@
 
 #include "exp.h"
 #include "env.h"
+#include "util/vector.h"
 
 enum record_type {
   EXP,
@@ -111,8 +112,18 @@ struct env *gc_alloc_env(struct env *parent) {
 static void gc_free(struct record *rec) {
   switch (rec->type) {
   case EXP:
-    if (rec->data.exp.type == SYMBOL) {
+    switch (rec->data.exp.type) {
+    case SYMBOL:
       free(rec->data.exp.value.symbol);
+      break;
+    case STRING:
+      free(rec->data.exp.value.string);
+      break;
+    case VECTOR:
+      vector_free(&rec->data.exp.value.vector, NULL);
+      break;
+    default:
+      break;
     }
     break;
   case ENV:

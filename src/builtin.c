@@ -5,6 +5,7 @@
 #include "err.h"
 #include "gc_alloc.h"
 #include "interp.h"
+#include "util/vector.h"
 
 static struct exp *fn_number_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
@@ -16,6 +17,12 @@ static struct exp *fn_pair_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "pair? requires exactly one argument");
   return CAR(args)->type == PAIR ? TRUE : FALSE;
+}
+
+static struct exp *fn_vector_p(struct exp *args) {
+  err_ensure(exp_list_length(args) == 1,
+             "vector? requires exactly one argument");
+  return CAR(args)->type == VECTOR ? TRUE : FALSE;
 }
 
 static struct exp *fn_symbol_p(struct exp *args) {
@@ -168,6 +175,37 @@ static struct exp *fn_cdr(struct exp *args) {
   return CDR(args);
 }
 
+static struct exp *fn_make_vector(struct exp *args) {
+  size_t len = exp_list_length(args);
+  err_ensure(len == 1 || len == 2,
+             "make-vector requires exactly one or two arguments");
+  return OK;
+}
+
+static struct exp *fn_vector_length(struct exp *args) {
+  err_ensure(exp_list_length(args) == 1,
+             "vector-length requires exactly one argument");
+  struct exp *vector = CAR(args);
+  err_ensure(vector->type == VECTOR,
+             "vector-length requires a vector argument");
+  return exp_make_fixnum(vector_length(vector->value.vector));
+}
+
+static struct exp *fn_vector_ref(struct exp *args) {
+  err_ensure(exp_list_length(args) == 2,
+             "vector-ref requires exactly two arguments");
+  struct exp *vector = CAR(args);
+  struct exp *index = CAR(CDR(args));
+  err_ensure(vector->type == VECTOR,
+             "vector-ref requires a vector argument");
+  err_ensure(index->type == FIXNUM,
+             "vector-ref requires a numeric index");
+  long i = index->value.fixnum;
+  err_ensure(i >= 0 && i < vector_length(vector->value.vector),
+             "vector-ref requires a valid index");
+  return vector_get(vector->value.vector, i);
+}
+
 static struct exp *fn_eval(struct exp *args) {
   err_ensure(exp_list_length(args) == 1, "eval requires exactly one argument");
   return eval(CAR(args), &global_env);
@@ -196,6 +234,7 @@ void builtin_define(struct env *env) {
 #define DEFUN(sym, fn) define_primitive(env, sym, &fn)
   DEFUN("number?", fn_number_p);
   DEFUN("pair?", fn_pair_p);
+  DEFUN("vector?", fn_vector_p);
   DEFUN("symbol?", fn_symbol_p);
   DEFUN("string?", fn_string_p);
   DEFUN("+", fn_add);
@@ -209,6 +248,9 @@ void builtin_define(struct env *env) {
   DEFUN("cons", fn_cons);
   DEFUN("car", fn_car);
   DEFUN("cdr", fn_cdr);
+  DEFUN("make-vector", fn_make_vector);
+  DEFUN("vector-length", fn_vector_length);
+  DEFUN("vector-ref", fn_vector_ref);
   DEFUN("eval", fn_eval);
   DEFUN("apply", fn_apply);
   DEFUN("void", fn_void);

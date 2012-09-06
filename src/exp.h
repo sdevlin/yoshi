@@ -23,10 +23,7 @@ struct exp {
     long fixnum;
     char *symbol;
     char *string;
-    struct {
-      size_t len;
-      struct exp **items;
-    } vector;
+    struct vector *vector;
     struct exp *(*function)(struct exp *args);
     struct {
       struct exp *params;
@@ -61,6 +58,7 @@ extern struct exp *exp_make_closure(struct exp *params, struct exp *body,
 extern struct exp *exp_copy(struct exp *exp);
 extern int exp_symbol_eq(struct exp *exp, const char *s);
 extern size_t exp_list_length(struct exp *list);
+extern int exp_list_proper(struct exp *list);
 #define CAR(exp) (exp->value.pair.first)
 #define CDR(exp) (exp->value.pair.rest)
 extern struct exp *exp_nth(struct exp *list, size_t n);

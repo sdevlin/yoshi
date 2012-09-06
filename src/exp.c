@@ -9,6 +9,7 @@
 #include "err.h"
 #include "gc_alloc.h"
 #include "strbuf.h"
+#include "util/vector.h"
 
 struct exp nil = { .type = NIL_TYPE };
 struct exp ok = { .type = UNDEFINED };
@@ -76,12 +77,10 @@ struct exp *exp_make_vector(size_t len, ...) {
   va_list args;
   size_t i;
   struct exp *vector = gc_alloc_exp(VECTOR);
-  vector->value.vector.len = len;
-  vector->value.vector.items = malloc(len *
-                                      (sizeof *vector->value.vector.items));
+  vector->value.vector = vector_new(len);
   va_start(args, len);
   for (i = 0; i < len; i += 1) {
-    *(vector->value.vector.items + i) = va_arg(args, struct exp *);
+    vector_push(vector->value.vector, va_arg(args, struct exp *));
   }
   va_end(args);
   return vector;
@@ -142,11 +141,33 @@ int exp_symbol_eq(struct exp *exp, const char *s) {
 
 size_t exp_list_length(struct exp *list) {
   size_t len = 0;
+  err_ensure(exp_list_proper(list), "argument must be proper list");
   while (list != NIL) {
     list = CDR(list);
     len += 1;
   }
   return len;
+}
+
+int exp_list_proper(struct exp *list) {
+  struct exp *a = list;
+  struct exp *b = list;
+#define NEXT(x)                                 \
+  do {                                          \
+    if (x == NIL) {                             \
+      return 1;                                 \
+    }                                           \
+    x = CDR(x);                                 \
+  } while (0)
+  for (;;) {
+    NEXT(a);
+    NEXT(b);
+    NEXT(b);
+    if (a == b) {
+      return 0;
+    }
+  }
+#undef NEXT
 }
 
 struct exp *exp_nth(struct exp *list, size_t n) {
@@ -267,12 +288,12 @@ char *exp_stringify(struct exp *exp) {
       len = 0;
       str[len] = '\0';
       CAT("#(");
-      for (i = 0; i < exp->value.vector.len; i += 1) {
+      for (i = 0; i < vector_length(exp->value.vector); i += 1) {
         char *s;
         if (i > 0) {
           CAT(" ");
         }
-        s = exp_stringify(*(exp->value.vector.items + i));
+        s = exp_stringify(vector_get(exp->value.vector, i));
         CAT(s);
         free(s);
       }
