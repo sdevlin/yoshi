@@ -39,7 +39,6 @@ static struct exp *fn_string_p(struct exp *args) {
 
 static struct exp *fn_add(struct exp *args) {
   long acc = 0;
-  err_ensure(exp_list_length(args) > 0, "+ requires at least one argument");
   while (args != NIL) {
     struct exp *e = CAR(args);
     err_ensure(e->type == FIXNUM, "+ requires numeric arguments");
@@ -69,7 +68,6 @@ static struct exp *fn_sub(struct exp *args) {
 
 static struct exp *fn_mul(struct exp *args) {
   long acc = 1;
-  err_ensure(exp_list_length(args) > 0, "* requires at least one argument");
   while (args != NIL) {
     struct exp *e = CAR(args);
     err_ensure(e->type == FIXNUM, "* requires numeric arguments");
