@@ -1,5 +1,3 @@
-vectors
 chars
 ports
 bignum?
-makefile generated dependencies has bug because deps are in subdir
