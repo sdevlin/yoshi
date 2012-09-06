@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdlib.h>
 
+#include "config.h"
 #include "exp.h"
 #include "env.h"
 #include "err.h"
@@ -22,6 +24,11 @@ static struct exp *map_list(struct exp *list, struct env *env,
 
 struct exp *eval(struct exp *exp, struct env *env) {
   for (;;) {
+    if (config.debug) {
+      char *str = exp_stringify(exp);
+      printf("eval: %s\n", str);
+      free(str);
+    }
     if (is_self_eval(exp)) {
       return exp;
     } else if (is_var(exp)) {
