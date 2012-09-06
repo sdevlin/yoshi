@@ -1,3 +1,6 @@
+(define (apply f args)
+  (eval `(,f ,@args)))
+
 (define (not x)
   (eq? x #f))
 

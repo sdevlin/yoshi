@@ -4,7 +4,7 @@
 #include "env.h"
 #include "err.h"
 #include "gc_alloc.h"
-#include "interp.h"
+#include "eval.h"
 #include "util/vector.h"
 
 static struct exp *fn_number_p(struct exp *args) {
@@ -211,12 +211,6 @@ static struct exp *fn_eval(struct exp *args) {
   return eval(CAR(args), &global_env);
 }
 
-static struct exp *fn_apply(struct exp *args) {
-  err_ensure(exp_list_length(args) == 2,
-             "apply requires exactly two arguments");
-  return apply(exp_nth(args, 0), exp_nth(args, 1), &global_env);
-}
-
 static struct exp *fn_void(struct exp *args) {
   err_ensure(exp_list_length(args) == 0,
              "void requires exactly zero arguments");
@@ -252,7 +246,6 @@ void builtin_define(struct env *env) {
   DEFUN("vector-length", fn_vector_length);
   DEFUN("vector-ref", fn_vector_ref);
   DEFUN("eval", fn_eval);
-  DEFUN("apply", fn_apply);
   DEFUN("void", fn_void);
 #undef DEFUN
 }

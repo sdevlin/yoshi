@@ -8,7 +8,7 @@
 #include "err.h"
 #include "read.h"
 #include "print.h"
-#include "interp.h"
+#include "eval.h"
 #include "gc.h"
 
 struct env global_env;

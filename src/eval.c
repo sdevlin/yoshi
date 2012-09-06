@@ -4,7 +4,6 @@
 #include "env.h"
 #include "err.h"
 #include "gc_alloc.h"
-#include "interp.h"
 
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
@@ -90,27 +89,6 @@ struct exp *eval(struct exp *exp, struct env *env) {
     } else {
       return err_error("eval: unknown exp type");
     }
-  }
-}
-
-struct exp *apply(struct exp *fn, struct exp *args, struct env *env) {
-  switch (fn->type) {
-  case FUNCTION:
-    return (*fn->value.function)(args);
-  case CLOSURE:
-    {
-      struct env *new_env = extend_env(fn->value.closure.params, args,
-                                       fn->value.closure.env);
-      struct exp *exp = fn->value.closure.body;
-      struct exp *result = OK;
-      while (exp != NIL) {
-        result = eval(CAR(exp), new_env);
-        exp = CDR(exp);
-      }
-      return result;
-    }
-  default:
-    return err_error("apply: bad function type");
   }
 }
 
@@ -217,8 +195,10 @@ static struct exp *expand_cond(struct exp *conds) {
 }
 
 static int is_self_eval(struct exp *exp) {
-  return exp->type == FIXNUM || exp->type == STRING ||
-    exp->type == BOOLEAN || exp->type == VECTOR;
+#define TYPEOF(t) (exp->type == (t))
+  return TYPEOF(FIXNUM) || TYPEOF(BOOLEAN) || TYPEOF(STRING) ||
+    TYPEOF(VECTOR) || TYPEOF(CLOSURE) || TYPEOF(FUNCTION);
+#undef TYPEOF
 }
 
 static int is_var(struct exp *exp) {
