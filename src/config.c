@@ -36,7 +36,7 @@ void config_init(int argc, char **argv) {
 }
 
 #ifndef PREFIX
-#define PREFIX "."
+#define PREFIX "/home/sean/proj/yoshi/"
 #endif
 
 FILE *config_next_file(void) {
