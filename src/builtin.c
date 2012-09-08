@@ -205,14 +205,9 @@ static struct exp *fn_vector_ref(struct exp *args) {
 }
 
 static struct exp *fn_eval(struct exp *args) {
-  err_ensure(exp_list_length(args) == 1, "eval requires exactly one argument");
+  err_ensure(exp_list_length(args) == 1,
+             "eval requires exactly one argument");
   return eval(CAR(args), &global_env);
-}
-
-static struct exp *fn_void(struct exp *args) {
-  err_ensure(exp_list_length(args) == 0,
-             "void requires exactly zero arguments");
-  return OK;
 }
 
 static void define_primitive(struct env *env, char *symbol,
@@ -244,6 +239,5 @@ void builtin_define(struct env *env) {
   DEFUN("vector-length", fn_vector_length);
   DEFUN("vector-ref", fn_vector_ref);
   DEFUN("eval", fn_eval);
-  DEFUN("void", fn_void);
 #undef DEFUN
 }
