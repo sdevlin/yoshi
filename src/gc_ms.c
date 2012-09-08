@@ -10,8 +10,8 @@ enum record_type {
 };
 
 enum mark_type {
-  FREE,
-  KEEP
+  WHITE,
+  BLACK
 };
 
 struct record {
@@ -78,7 +78,7 @@ static void gc_sweep(void) {
   struct record *curr = prev->next;
   while (curr != NULL) {
     if (curr->mark) {
-      curr->mark = FREE;
+      curr->mark = WHITE;
       prev = curr;
       curr = curr->next;
     } else {
@@ -158,14 +158,14 @@ static int gc_is_managed(void *ptr) {
 static void gc_maybe_mark(void *ptr) {
   if (gc_is_managed(ptr)) {
     struct record *rec = ptr;
-    rec->mark = KEEP;
+    rec->mark = BLACK;
   }
 }
 
 static int gc_should_proceed(void *ptr) {
   if (gc_is_managed(ptr)) {
     struct record *rec = ptr;
-    return rec->mark == FREE;
+    return rec->mark == WHITE;
   } else {
     return ptr == &global_env;
   }
