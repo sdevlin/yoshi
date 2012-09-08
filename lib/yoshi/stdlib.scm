@@ -1,7 +1,9 @@
-;; something is not quite right here
-;; due to bugs in quasiquote expansion
+(define (void))
+
 (define (apply f args)
-  (eval `(,f ,@args)))
+  (define (quote-all l)
+    (map (lambda (x) `(quote ,x)) l))
+  (eval (quote-all `(,f ,@args))))
 
 (define (not x)
   (eq? x #f))
@@ -12,7 +14,6 @@
 (define (boolean? x)
   (or (eq? x #t) (eq? x #f)))
 
-;; this doesn't work due to bugs in apply
 (define (equal? . args)
   (define (eql? a b)
     (cond

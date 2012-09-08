@@ -11,10 +11,10 @@ static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
-static struct exp *eval_quasiquote(struct exp *exp, struct env *env);
 static struct exp *eval_and(struct exp *and, struct env *env);
 static struct exp *eval_or(struct exp *or, struct env *env);
-static struct exp *expand_begin(struct exp *begin);
+static struct exp *expand_quasiquote(struct exp *exp);
+static struct exp *expand_begin(struct exp *forms);
 static struct exp *expand_cond(struct exp *cond);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
@@ -34,9 +34,11 @@ struct exp *eval(struct exp *exp, struct env *env) {
     } else if (is_var(exp)) {
       return env_lookup(env, exp);
     } else if (is_tagged(exp, "quote")) {
+      err_ensure(exp_list_length(exp) == 2,
+                 "eval: bad syntax in quote");
       return exp_nth(exp, 1);
     } else if (is_tagged(exp, "quasiquote")) {
-      return eval_quasiquote(exp_nth(exp, 1), env);
+      exp = expand_quasiquote(exp_nth(exp, 1));
     } else if (is_tagged(exp, "set!")) {
       return env_update(env, exp_nth(exp, 1), eval(exp_nth(exp, 2), env));
     } else if (is_tagged(exp, "define")) {
@@ -111,51 +113,6 @@ static struct exp *map_list(struct exp *list, struct env *env,
   }
 }
 
-// the messiest, least coherent function in the whole program
-// and probably the buggiest
-// there must be a better way, but i don't know what it is
-static struct exp *eval_quasiquote(struct exp *exp, struct env *env) {
-  if (exp->type == PAIR) {
-    struct exp *list = NULL;
-    struct exp *node = NULL;
-    while (exp->type == PAIR) {
-      struct exp *item = CAR(exp);
-      int is_splice = 0;
-      if (is_tagged(item, "unquote")) {
-        item = eval(exp_nth(item, 1), env);
-      } else if (is_tagged(item, "unquote-splicing")) {
-        item = eval(exp_nth(item, 1), env);
-        is_splice = 1;
-      }
-      if (is_splice) {
-        if (node == NULL) {
-          list = node = item;
-        } else {
-          node->value.pair.rest = item;
-        }
-        while (node->value.pair.rest->type == PAIR) {
-          node = node->value.pair.rest;
-        }
-      } else {
-        if (node == NULL) {
-          list = node = exp_make_pair(item, NULL);
-        } else {
-          node->value.pair.rest = exp_make_pair(NULL, NULL);
-          node = node->value.pair.rest;
-          node->value.pair.first = item;
-        }
-      }
-      exp = CDR(exp);
-    }
-    if (node->value.pair.rest == NULL) {
-      node->value.pair.rest = exp;
-    }
-    return list;
-  } else {
-    return exp;
-  }
-}
-
 static struct exp *eval_and(struct exp *and, struct env *env) {
   struct exp *result = TRUE;
   while (and != NIL) {
@@ -177,6 +134,34 @@ static struct exp *eval_or(struct exp *or, struct env *env) {
     or = CDR(or);
   }
   return FALSE;
+}
+
+// doesn't handle nested quasiquote
+static struct exp *expand_quasiquote(struct exp *exp) {
+  if (exp->type != PAIR) {
+    return exp_make_list(exp_make_symbol("quote"),
+                         exp,
+                         NULL);
+  }
+  err_ensure(!is_tagged(exp, "unquote-splicing"),
+             "expand_quasiquote: unexpected unquote-splicing");
+  if (is_tagged(exp, "unquote")) {
+    err_ensure(exp_list_length(exp) == 2,
+               "expand_quasiquote: bad syntax in unquote");
+    return exp_nth(exp, 1);
+  } else if (is_tagged(CAR(exp), "unquote-splicing")) {
+    err_ensure(exp_list_length(CAR(exp)) == 2,
+               "expand_quasiquote: bad syntax in unquote-splicing");
+    return exp_make_list(exp_make_symbol("append"),
+                         exp_nth(CAR(exp), 1),
+                         expand_quasiquote(CDR(exp)),
+                         NULL);
+  } else {
+      return exp_make_list(exp_make_symbol("cons"),
+                           expand_quasiquote(CAR(exp)),
+                           expand_quasiquote(CDR(exp)),
+                           NULL);
+  }
 }
 
 static struct exp *expand_begin(struct exp *forms) {
