@@ -145,14 +145,14 @@ static void gc_free(struct record *rec) {
   free(rec);
 }
 
-#define IS_NOT(x) (ptr != (x))
-
 static int gc_is_managed(void *ptr) {
+#define IS_NOT(x) (ptr != (x))
   return IS_NOT(&global_env) &&
     IS_NOT(OK) &&
     IS_NOT(NIL) &&
     IS_NOT(TRUE) &&
     IS_NOT(FALSE);
+#undef IS_NOT
 }
 
 static void gc_maybe_mark(void *ptr) {
@@ -170,5 +170,3 @@ static int gc_should_proceed(void *ptr) {
     return ptr == &global_env;
   }
 }
-
-#undef IS_NOT
