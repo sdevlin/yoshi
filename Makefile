@@ -3,12 +3,12 @@ CFLAGS = -Wall -Werror -pedantic -std=c99
 
 TARGET = bin/yoshi
 
-GC_IMP = src/gc_ms.c
+GC ?= src/gc_ms.c
 
-SOURCES = $(filter-out src/gc_%.c, $(wildcard src/**/*.c src/*.c))
-SOURCES += $(GC_IMP)
-OBJECTS = $(SOURCES:.c=.o)
-DEPENDS = $(SOURCES:.c=.d)
+SRCS = $(filter-out src/gc_%.c, $(wildcard src/**/*.c src/*.c))
+SRCS += $(GC)
+OBJS = $(SRCS:.c=.o)
+DEPS = $(SRCS:.c=.d)
 
 dev: CFLAGS += -g
 dev: $(TARGET)
@@ -22,11 +22,11 @@ release: $(TARGET)
 install: release
 	install $(TARGET) $(HOME)/bin/
 
-$(TARGET): $(OBJECTS)
+$(TARGET): $(OBJS)
 	@mkdir -p bin
 	$(CC) $(CFLAGS) $^ -o $(TARGET)
 
--include $(DEPENDS)
+-include $(DEPS)
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
@@ -37,9 +37,9 @@ $(TARGET): $(OBJECTS)
 	@rm -f $*.d.tmp
 
 clobber: clean
-	rm -f $(TARGET) || true
+	rm -r bin || true
 
 clean:
-	rm -f $(OBJECTS) $(DEPENDS) || true
+	rm -f $(OBJS) $(DEPS) || true
 
 .PHONY: dev prof release install clobber clean
