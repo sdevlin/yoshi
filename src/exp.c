@@ -8,7 +8,7 @@
 #include "exp.h"
 #include "err.h"
 #include "gc_alloc.h"
-#include "strbuf.h"
+#include "util/strbuf.h"
 #include "util/vector.h"
 
 struct exp nil = { .type = NIL_TYPE };

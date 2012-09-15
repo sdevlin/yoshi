@@ -4,7 +4,7 @@
 
 #include "exp.h"
 #include "err.h"
-#include "strbuf.h"
+#include "util/strbuf.h"
 #include "util/vector.h"
 
 static void eat_space(FILE *infile);
