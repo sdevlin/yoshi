@@ -164,6 +164,9 @@ static struct exp *expand_quasiquote(struct exp *exp) {
   }
 }
 
+// this is not really correct
+// begin should not create a scope
+// but lambda will
 static struct exp *expand_begin(struct exp *forms) {
   struct exp *lambda;
   lambda = exp_make_list(exp_make_symbol("lambda"),
