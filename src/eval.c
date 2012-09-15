@@ -14,7 +14,6 @@ static int is_apply(struct exp *exp);
 static struct exp *eval_and(struct exp *and, struct env *env);
 static struct exp *eval_or(struct exp *or, struct env *env);
 static struct exp *expand_quasiquote(struct exp *exp);
-static struct exp *expand_begin(struct exp *forms);
 static struct exp *expand_cond(struct exp *cond);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
@@ -66,7 +65,16 @@ struct exp *eval(struct exp *exp, struct env *env) {
     } else if (is_tagged(exp, "lambda")) {
       return exp_make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
     } else if (is_tagged(exp, "begin")) {
-      exp = expand_begin(CDR(exp));
+      exp = CDR(exp);
+      if (exp == NIL) {
+        return OK;
+      } else {
+        while (CDR(exp) != NIL) {
+          eval(CAR(exp), env);
+          exp = CDR(exp);
+        }
+        exp = CAR(exp);
+      }
     } else if (is_tagged(exp, "cond")) {
       exp = expand_cond(CDR(exp));
     } else if (is_apply(exp)) {
@@ -162,18 +170,6 @@ static struct exp *expand_quasiquote(struct exp *exp) {
                            expand_quasiquote(CDR(exp)),
                            NULL);
   }
-}
-
-// this is not really correct
-// begin should not create a scope
-// but lambda will
-static struct exp *expand_begin(struct exp *forms) {
-  struct exp *lambda;
-  lambda = exp_make_list(exp_make_symbol("lambda"),
-                         NIL,
-                         NULL);
-  CDR(lambda)->value.pair.rest = exp_copy(forms);
-  return exp_make_list(lambda, NULL);
 }
 
 static struct exp *expand_cond(struct exp *conds) {
