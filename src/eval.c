@@ -11,8 +11,6 @@ static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
-static struct exp *eval_and(struct exp *and, struct env *env);
-static struct exp *eval_or(struct exp *or, struct env *env);
 static struct exp *expand_quasiquote(struct exp *exp);
 static struct exp *expand_cond(struct exp *cond);
 static struct env *extend_env(struct exp *params, struct exp *args,
@@ -59,9 +57,32 @@ struct exp *eval(struct exp *exp, struct env *env) {
         exp = exp_nth(exp, 3);
       }
     } else if (is_tagged(exp, "and")) {
-      return eval_and(CDR(exp), env);
+      exp = CDR(exp);
+      if (exp == NIL) {
+        return TRUE;
+      } else {
+        while (CDR(exp) != NIL) {
+          if (eval(CAR(exp), env) == FALSE) {
+            return FALSE;
+          }
+          exp = CDR(exp);
+        }
+        exp = CAR(exp);
+      }
     } else if (is_tagged(exp, "or")) {
-      return eval_or(CDR(exp), env);
+      exp = CDR(exp);
+      if (exp == NIL) {
+        return FALSE;
+      } else {
+        while (CDR(exp) != NIL) {
+          struct exp *result = eval(CAR(exp), env);
+          if (result != FALSE) {
+            return result;
+          }
+          exp = CDR(exp);
+        }
+        exp = CAR(exp);
+      }
     } else if (is_tagged(exp, "lambda")) {
       return exp_make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
     } else if (is_tagged(exp, "begin")) {
@@ -119,29 +140,6 @@ static struct exp *map_list(struct exp *list, struct env *env,
     struct exp *rest = map_list(CDR(list), env, fn);
     return exp_make_pair(first, rest);
   }
-}
-
-static struct exp *eval_and(struct exp *and, struct env *env) {
-  struct exp *result = TRUE;
-  while (and != NIL) {
-    result = eval(CAR(and), env);
-    if (result == FALSE) {
-      return FALSE;
-    }
-    and = CDR(and);
-  }
-  return result;
-}
-
-static struct exp *eval_or(struct exp *or, struct env *env) {
-  while (or != NIL) {
-    struct exp *result = eval(CAR(or), env);
-    if (result != FALSE) {
-      return result;
-    }
-    or = CDR(or);
-  }
-  return FALSE;
 }
 
 // doesn't handle nested quasiquote
