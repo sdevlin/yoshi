@@ -195,7 +195,7 @@ char *exp_stringify(struct exp *exp) {
     return str;
   case STRING:
     {
-      struct strbuf *buf = strbuf_make(0);
+      struct strbuf *buf = strbuf_new(0);
       size_t i;
       len = strlen(exp->value.string);
       strbuf_push(buf, '"');

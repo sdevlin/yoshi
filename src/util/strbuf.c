@@ -7,7 +7,7 @@ struct strbuf {
   char *buf;
 };
 
-struct strbuf *strbuf_make(size_t cap) {
+struct strbuf *strbuf_new(size_t cap) {
   struct strbuf *buf = malloc(sizeof *buf);
   buf->len = 0;
   buf->cap = cap > 0 ? cap : 8;

@@ -69,7 +69,7 @@ static void eat_until(FILE *infile, int c) {
 }
 
 static struct exp *read_atom(FILE *infile) {
-  struct strbuf *buf = strbuf_make(0);
+  struct strbuf *buf = strbuf_new(0);
   for (;;) {
     int c = getc(infile);
     if (isspace(c) || c == '(' || c == ')') {
@@ -108,7 +108,7 @@ static struct exp *read_pair(FILE *infile) {
 }
 
 static struct exp *read_string(FILE *infile) {
-  struct strbuf *buf = strbuf_make(0);
+  struct strbuf *buf = strbuf_new(0);
   int c;
   while ((c = getc(infile)) != '"') {
     if (c == '\\') {
