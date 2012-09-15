@@ -33,6 +33,10 @@ static void gc_mark_env(struct env *env);
 static void gc_sweep(void);
 static void gc_free(struct record *rec);
 
+void gc_init(void) {
+
+}
+
 void gc_collect(void) {
   gc_mark_env(&global_env);
   gc_sweep();

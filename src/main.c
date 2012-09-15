@@ -17,6 +17,7 @@ static FILE *infile;
 
 int main(int argc, char **argv) {
   config_init(argc, argv);
+  gc_init();
   builtin_define(&global_env);
   infile = config_next_file();
   for (;;) {
