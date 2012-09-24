@@ -1,7 +1,10 @@
 CC = gcc
-CFLAGS = -Wall -Werror -pedantic -std=c99
+CFLAGS = -Wall -Werror -pedantic -std=c99 -D PREFIX=\"$(PREFIX)\"
 
 TARGET = bin/yoshi
+STDLIB = lib/yoshi/stdlib.scm
+
+PREFIX ?= $(CURDIR)
 
 GC ?= src/gc_ms.c
 
@@ -19,8 +22,10 @@ prof: dev
 release: CFLAGS += -O3
 release: $(TARGET)
 
+install: PREFIX = $(HOME)
 install: release
-	install $(TARGET) $(HOME)/bin/
+	install -D $(TARGET) $(PREFIX)/$(TARGET)
+	install -m 644 -D $(STDLIB) $(PREFIX)/$(STDLIB)
 
 $(TARGET): $(OBJS)
 	@mkdir -p bin
