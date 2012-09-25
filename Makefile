@@ -41,10 +41,13 @@ $(TARGET): $(OBJS)
 	@sed -e 's/.*://' -e 's/\\$$//' <$*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >>$*.d
 	@rm -f $*.d.tmp
 
+check-syntax:
+	$(CC) -o /dev/null -S $(CHK_SOURCES)
+
 clobber: clean
 	rm -r bin || true
 
 clean:
 	rm -f $(OBJS) $(DEPS) || true
 
-.PHONY: dev prof release install clobber clean
+.PHONY: dev prof release install check-syntax clobber clean
