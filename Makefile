@@ -45,9 +45,10 @@ check-syntax:
 	$(CC) -o /dev/null -S $(CHK_SOURCES)
 
 clobber: clean
-	rm -r bin || true
+	rm $(TARGET) || true
 
 clean:
-	rm -f $(OBJS) $(DEPS) || true
+	find src -name '*.o' -exec rm {} \;
+	find src -name '*.d' -exec rm {} \;
 
 .PHONY: dev prof release install check-syntax clobber clean
