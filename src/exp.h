@@ -7,6 +7,7 @@ enum exp_type {
   BOOLEAN,
   SYMBOL,
   STRING,
+  CHARACTER,
   VECTOR,
   CLOSURE,
   FUNCTION,
@@ -23,6 +24,7 @@ struct exp {
     long fixnum;
     char *symbol;
     char *string;
+    char character;
     struct vector *vector;
     struct exp *(*function)(struct exp *args);
     struct {
@@ -50,6 +52,7 @@ extern struct exp *exp_make_symbol(const char *sym);
 extern struct exp *exp_make_list(struct exp *first, ...);
 extern struct exp *exp_make_vector(size_t len, ...);
 extern struct exp *exp_make_string(char *str);
+extern struct exp *exp_make_character(int c);
 extern struct exp *exp_make_pair(struct exp *first, struct exp *rest);
 extern struct exp *exp_make_fixnum(long fixnum);
 struct env;
@@ -57,6 +60,8 @@ extern struct exp *exp_make_closure(struct exp *params, struct exp *body,
                                     struct env *env);
 extern struct exp *exp_copy(struct exp *exp);
 extern int exp_symbol_eq(struct exp *exp, const char *s);
+extern int exp_name_to_char(const char *name);
+extern const char *exp_char_to_name(int c);
 extern size_t exp_list_length(struct exp *list);
 extern int exp_list_proper(struct exp *list);
 #define CAR(exp) (exp->value.pair.first)

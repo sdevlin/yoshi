@@ -186,7 +186,8 @@ static struct exp *expand_cond(struct exp *conds) {
 static int is_self_eval(struct exp *exp) {
 #define TYPEOF(t) (exp->type == (t))
   return TYPEOF(FIXNUM) || TYPEOF(BOOLEAN) || TYPEOF(STRING) ||
-    TYPEOF(VECTOR) || TYPEOF(CLOSURE) || TYPEOF(FUNCTION);
+    TYPEOF(CHARACTER) || TYPEOF(VECTOR) || TYPEOF(CLOSURE) ||
+    TYPEOF(FUNCTION);
 #undef TYPEOF
 }
 

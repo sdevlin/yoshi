@@ -92,6 +92,12 @@ struct exp *exp_make_string(char *str) {
   return string;
 }
 
+struct exp *exp_make_character(int c) {
+  struct exp *character = gc_alloc_exp(CHARACTER);
+  character->value.character = c;
+  return character;
+}
+
 struct exp *exp_make_pair(struct exp *first, struct exp *rest) {
   struct exp *pair = gc_alloc_exp(PAIR);
   pair->value.pair.first = first;
@@ -138,6 +144,47 @@ struct exp *exp_copy(struct exp *exp) {
 int exp_symbol_eq(struct exp *exp, const char *s) {
   return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
 }
+
+struct char_mapping {
+  const char *name;
+  int value;
+};
+
+static struct char_mapping char_map[] = {
+  { .name = "alarm", .value = '\a' },
+  { .name = "backspace", .value = '\b' },
+  { .name = "delete", .value = 0x7f },
+  { .name = "escape", .value = 0x1b },
+  { .name = "newline", .value = '\n' },
+  { .name = "null", .value = '\0' },
+  { .name = "return", .value = '\r' },
+  { .name = "space", .value = ' ' },
+  { .name = "tab", .value = '\t' },
+};
+
+#define NELEM(arr) ((sizeof arr) / (sizeof arr[0]))
+
+int exp_name_to_char(const char *name) {
+  size_t i;
+  for (i = 0; i < NELEM(char_map); i += 1) {
+    if (!strcmp(name, char_map[i].name)) {
+      return char_map[i].value;
+    }
+  }
+  return -1;
+}
+
+const char *exp_char_to_name(int c) {
+  size_t i;
+  for (i = 0; i < NELEM(char_map); i += 1) {
+    if (c == char_map[i].value) {
+      return char_map[i].name;
+    }
+  }
+  return NULL;
+}
+
+#undef NELEM
 
 size_t exp_list_length(struct exp *list) {
   size_t len = 0;
@@ -219,6 +266,23 @@ char *exp_stringify(struct exp *exp) {
       str = strbuf_to_cstr(buf);
       strbuf_free(buf);
       return str;
+    }
+  case CHARACTER:
+    if (isgraph(exp->value.character)) {
+      str = malloc(4);
+      sprintf(str, "#\\%c", exp->value.character);
+      return str;
+    } else {
+      const char *name = exp_char_to_name(exp->value.character);
+      if (name != NULL) {
+        str = malloc(strlen(name) + 3);
+        sprintf(str, "#\\%s", name);
+        return str;
+      } else {
+        str = malloc(6);
+        sprintf(str, "#\\x%02x", exp->value.character);
+        return str;
+      }
     }
   case FIXNUM:
     len = 0;
