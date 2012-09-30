@@ -5,9 +5,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "config.h"
 #include "exp.h"
 #include "err.h"
-#include "gc_alloc.h"
+#include "gc.h"
 #include "util/strbuf.h"
 #include "util/vector.h"
 
@@ -46,7 +47,7 @@ struct exp *exp_make_atom(const char *str) {
 }
 
 struct exp *exp_make_symbol(const char *sym) {
-  struct exp *symbol = gc_alloc_exp(SYMBOL);
+  struct exp *symbol = (*gc->alloc_exp)(SYMBOL);
   symbol->value.symbol = malloc(strlen(sym) + 1);
   strcpy(symbol->value.symbol, sym);
   return symbol;
@@ -76,7 +77,7 @@ struct exp *exp_make_list(struct exp *first, ...) {
 struct exp *exp_make_vector(size_t len, ...) {
   va_list args;
   size_t i;
-  struct exp *vector = gc_alloc_exp(VECTOR);
+  struct exp *vector = (*gc->alloc_exp)(VECTOR);
   vector->value.vector = vector_new(len);
   va_start(args, len);
   for (i = 0; i < len; i += 1) {
@@ -87,33 +88,33 @@ struct exp *exp_make_vector(size_t len, ...) {
 }
 
 struct exp *exp_make_string(char *str) {
-  struct exp *string = gc_alloc_exp(STRING);
+  struct exp *string = (*gc->alloc_exp)(STRING);
   string->value.string = str;
   return string;
 }
 
 struct exp *exp_make_character(int c) {
-  struct exp *character = gc_alloc_exp(CHARACTER);
+  struct exp *character = (*gc->alloc_exp)(CHARACTER);
   character->value.character = c;
   return character;
 }
 
 struct exp *exp_make_pair(struct exp *first, struct exp *rest) {
-  struct exp *pair = gc_alloc_exp(PAIR);
+  struct exp *pair = (*gc->alloc_exp)(PAIR);
   pair->value.pair.first = first;
   pair->value.pair.rest = rest;
   return pair;
 }
 
 struct exp *exp_make_fixnum(long fixnum) {
-  struct exp *e = gc_alloc_exp(FIXNUM);
+  struct exp *e = (*gc->alloc_exp)(FIXNUM);
   e->value.fixnum = fixnum;
   return e;
 }
 
 struct exp *exp_make_closure(struct exp *params, struct exp *body,
                              struct env *env) {
-  struct exp *e = gc_alloc_exp(CLOSURE);
+  struct exp *e = (*gc->alloc_exp)(CLOSURE);
   e->value.closure.params = params;
   e->value.closure.body = body;
   e->value.closure.env = env;

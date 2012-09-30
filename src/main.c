@@ -17,7 +17,7 @@ static FILE *infile;
 
 int main(int argc, char **argv) {
   config_init(argc, argv);
-  gc_init();
+  (*gc->init)();
   builtin_define(&global_env);
   infile = config_next_file();
   for (;;) {
@@ -40,6 +40,6 @@ int main(int argc, char **argv) {
     } else {
       printf("error: %s\n", err_msg);
     }
-    gc_collect();
+    (*gc->collect)();
   }
 }

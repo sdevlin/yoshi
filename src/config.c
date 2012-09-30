@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "gc.h"
 
 static struct {
   size_t count;
@@ -10,6 +11,8 @@ static struct {
 } file_info;
 
 struct flags config;
+
+struct gc *gc;
 
 void config_init(int argc, char **argv) {
   argc -= 1;
@@ -33,6 +36,7 @@ void config_init(int argc, char **argv) {
   if (file_info.count == 0) {
     config.interactive = ON;
   }
+  gc = &gc_ms;
 }
 
 #ifndef PREFIX

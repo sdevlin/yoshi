@@ -1,9 +1,10 @@
 #include <string.h>
 
+#include "config.h"
 #include "exp.h"
 #include "env.h"
 #include "err.h"
-#include "gc_alloc.h"
+#include "gc.h"
 #include "eval.h"
 #include "util/vector.h"
 
@@ -212,7 +213,7 @@ static struct exp *fn_eval(struct exp *args) {
 
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
-  struct exp *e = gc_alloc_exp(FUNCTION);
+  struct exp *e = (*gc->alloc_exp)(FUNCTION);
   e->value.function = function;
   env_define(env, exp_make_atom(symbol), e);
 }

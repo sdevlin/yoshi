@@ -6,10 +6,7 @@ STDLIB = lib/yoshi/stdlib.scm
 
 PREFIX ?= $(CURDIR)
 
-GC ?= src/gc_ms.c
-
-SRCS = $(filter-out src/gc_%.c, $(wildcard src/**/*.c src/*.c))
-SRCS += $(GC)
+SRCS = $(wildcard src/**/*.c src/*.c)
 OBJS = $(SRCS:.c=.o)
 DEPS = $(SRCS:.c=.d)
 
@@ -45,10 +42,9 @@ check-syntax:
 	$(CC) -o /dev/null -S $(CHK_SOURCES)
 
 clobber: clean
-	rm $(TARGET) || true
+	rm -f $(TARGET) || true
 
 clean:
-	find src -name '*.o' -exec rm {} \;
-	find src -name '*.d' -exec rm {} \;
+	rm -f $(OBJS) $(DEPS) || true
 
 .PHONY: dev prof release install check-syntax clobber clean

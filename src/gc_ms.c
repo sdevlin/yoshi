@@ -2,7 +2,20 @@
 
 #include "exp.h"
 #include "env.h"
+#include "gc.h"
 #include "util/vector.h"
+
+static void gc_init(void);
+static void gc_collect(void);
+static struct exp *gc_alloc_exp(enum exp_type type);
+static struct env *gc_alloc_env(struct env *parent);
+
+struct gc gc_ms = {
+  .init = &gc_init,
+  .collect = &gc_collect,
+  .alloc_exp = &gc_alloc_exp,
+  .alloc_env = &gc_alloc_env
+};
 
 enum record_type {
   EXP,
@@ -33,11 +46,11 @@ static void gc_mark_env(struct env *env);
 static void gc_sweep(void);
 static void gc_free(struct record *rec);
 
-void gc_init(void) {
+static void gc_init(void) {
 
 }
 
-void gc_collect(void) {
+static void gc_collect(void) {
   gc_mark_env(&global_env);
   gc_sweep();
 }
@@ -101,13 +114,13 @@ static void *gc_alloc(enum record_type type) {
   return rec;
 }
 
-struct exp *gc_alloc_exp(enum exp_type type) {
+static struct exp *gc_alloc_exp(enum exp_type type) {
   struct exp *e = gc_alloc(EXP);
   e->type = type;
   return e;
 }
 
-struct env *gc_alloc_env(struct env *parent) {
+static struct env *gc_alloc_env(struct env *parent) {
   struct env *e = gc_alloc(ENV);
   e->parent = parent;
   return e;

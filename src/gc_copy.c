@@ -2,7 +2,20 @@
 
 #include "exp.h"
 #include "env.h"
+#include "gc.h"
 #include "util/vector.h"
+
+static void gc_init(void);
+static void gc_collect(void);
+static struct exp *gc_alloc_exp(enum exp_type type);
+static struct env *gc_alloc_env(struct env *parent);
+
+struct gc gc_copy = {
+  .init = &gc_init,
+  .collect = &gc_collect,
+  .alloc_exp = &gc_alloc_exp,
+  .alloc_env = &gc_alloc_env
+};
 
 enum record_type {
   EXP,

@@ -5,7 +5,7 @@
 #include "exp.h"
 #include "env.h"
 #include "err.h"
-#include "gc_alloc.h"
+#include "gc.h"
 
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
@@ -205,7 +205,7 @@ static int is_apply(struct exp *exp) {
 
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent) {
-  struct env *env = gc_alloc_env(parent);
+  struct env *env = (*gc->alloc_env)(parent);
   for (;;) {
     if (params == NIL && args == NIL) {
       return env;

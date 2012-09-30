@@ -11,6 +11,7 @@
 static int get(FILE *stream);
 static void unget(int c, FILE *stream);
 
+static void eat_while(FILE *infile, int (*pred)(int c));
 static void eat_space(FILE *infile);
 static void eat_until(FILE *infile, int c);
 static struct exp *read_atom(FILE *infile);
@@ -54,14 +55,18 @@ struct exp *read(FILE *infile) {
   }
 }
 
-static void eat_space(FILE *infile) {
+static void eat_while(FILE *infile, int (*pred)(int c)) {
   for (;;) {
     int c = get(infile);
-    if (!isspace(c)) {
+    if (!(*pred)(c)) {
       unget(c, infile);
       return;
     }
   }
+}
+
+static void eat_space(FILE *infile) {
+  eat_while(infile, &isspace);
 }
 
 static void eat_until(FILE *infile, int c) {
