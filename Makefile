@@ -30,6 +30,7 @@ $(TARGET): $(OBJS)
 
 -include $(DEPS)
 
+# the black magic after the first line constructs the dep files correctly
 %.o: %.c
 	$(CC) $(CFLAGS) -c $*.c -o $*.o
 	@$(CC) $(CFLAGS) -MM $*.c >$*.d
