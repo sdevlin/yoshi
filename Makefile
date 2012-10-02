@@ -16,10 +16,10 @@ dev: $(TARGET)
 prof: CFLAGS += -pg
 prof: dev
 
+release: PREFIX = $(HOME)
 release: CFLAGS += -O3
 release: $(TARGET)
 
-install: PREFIX = $(HOME)
 install: release
 	install -D $(TARGET) $(PREFIX)/$(TARGET)
 	install -m 644 -D $(STDLIB) $(PREFIX)/$(STDLIB)
