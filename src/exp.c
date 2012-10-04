@@ -319,7 +319,17 @@ char *exp_stringify(struct exp *exp) {
     }
     return str;
   case PAIR:
-    {
+    if (exp_symbol_eq(CAR(exp), "quote")) {
+      size_t cap = 2;
+      str = malloc(cap);
+      len = 0;
+      str[len] = '\0';
+      CAT("'");
+      char *s = exp_stringify(CAR(CDR(exp)));
+      CAT(s);
+      free(s);
+      return str;
+    } else {
       size_t cap = 1;
       str = malloc(cap);
       len = 0;

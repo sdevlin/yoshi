@@ -196,7 +196,7 @@ static int is_var(struct exp *exp) {
 }
 
 static int is_tagged(struct exp *exp, const char *s) {
-  return exp->type == PAIR && exp_symbol_eq(exp->value.pair.first, s);
+  return exp->type == PAIR && exp_symbol_eq(CAR(exp), s);
 }
 
 static int is_apply(struct exp *exp) {
