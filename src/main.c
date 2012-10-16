@@ -7,8 +7,9 @@
 #include "builtin.h"
 #include "err.h"
 #include "read.h"
-#include "print.h"
+#include "expand.h"
 #include "eval.h"
+#include "print.h"
 #include "gc.h"
 
 struct env global_env;
@@ -33,7 +34,7 @@ int main(int argc, char **argv) {
           continue;
         }
       }
-      e = eval(e, &global_env);
+      e = eval(expand(e), &global_env);
       if (!config.silent) {
         print(e);
       }
