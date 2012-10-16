@@ -12,6 +12,9 @@ static int is_var(struct exp *exp);
 static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
 static struct exp *expand_quasiquote(struct exp *exp);
+static struct exp *expand_and(struct exp *and);
+/* need hygienic macros to do this properly as an expansion */
+/* static struct exp *expand_or(struct exp *or); */
 static struct exp *expand_cond(struct exp *cond);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
@@ -57,18 +60,7 @@ struct exp *eval(struct exp *exp, struct env *env) {
         exp = exp_nth(exp, 3);
       }
     } else if (is_tagged(exp, "and")) {
-      exp = CDR(exp);
-      if (exp == NIL) {
-        return TRUE;
-      } else {
-        while (CDR(exp) != NIL) {
-          if (eval(CAR(exp), env) == FALSE) {
-            return FALSE;
-          }
-          exp = CDR(exp);
-        }
-        exp = CAR(exp);
-      }
+      exp = expand_and(CDR(exp));
     } else if (is_tagged(exp, "or")) {
       exp = CDR(exp);
       if (exp == NIL) {
@@ -167,6 +159,22 @@ static struct exp *expand_quasiquote(struct exp *exp) {
                            expand_quasiquote(CAR(exp)),
                            expand_quasiquote(CDR(exp)),
                            NULL);
+  }
+}
+
+static struct exp *expand_and(struct exp *and) {
+  size_t length = exp_list_length(and);
+  switch (length) {
+  case 0:
+    return TRUE;
+  case 1:
+    return CAR(and);
+  default:
+    return exp_make_list(exp_make_atom("if"),
+                         CAR(and),
+                         expand_and(CDR(and)),
+                         FALSE,
+                         NULL);
   }
 }
 
