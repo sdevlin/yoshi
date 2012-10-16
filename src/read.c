@@ -11,78 +11,78 @@
 static int get(FILE *stream);
 static void unget(int c, FILE *stream);
 
-static void eat_while(FILE *infile, int (*pred)(int c));
-static void eat_space(FILE *infile);
-static void eat_until(FILE *infile, int c);
-static struct exp *read_atom(FILE *infile);
-static struct exp *read_pair(FILE *infile);
-static struct exp *read_string(FILE *infile);
-static struct exp *read_hash(FILE *infile);
+static void eat_while(FILE *input, int (*pred)(int c));
+static void eat_space(FILE *input);
+static void eat_until(FILE *input, int c);
+static struct exp *read_atom(FILE *input);
+static struct exp *read_pair(FILE *input);
+static struct exp *read_string(FILE *input);
+static struct exp *read_hash(FILE *input);
 
-struct exp *read(FILE *infile) {
+struct exp *read(FILE *input) {
   int c;
-  eat_space(infile);
-  c = get(infile);
+  eat_space(input);
+  c = get(input);
   switch (c) {
   case EOF:
     return NULL;
   case '(':
-    return read_pair(infile);
+    return read_pair(input);
   case ')':
     return err_error("extra close parenthesis");
   case '"':
-    return read_string(infile);
+    return read_string(input);
   case '#':
-    return read_hash(infile);
+    return read_hash(input);
   case '\'':
-    return exp_make_list(exp_make_atom("quote"), read(infile), NULL);
+    return exp_make_list(exp_make_atom("quote"), read(input), NULL);
   case '`':
-    return exp_make_list(exp_make_atom("quasiquote"), read(infile), NULL);
+    return exp_make_list(exp_make_atom("quasiquote"), read(input), NULL);
   case ',':
-    if ((c = get(infile)) == '@') {
+    if ((c = get(input)) == '@') {
       return exp_make_list(exp_make_atom("unquote-splicing"),
-                           read(infile), NULL);
+                           read(input), NULL);
     } else {
-      unget(c, infile);
-      return exp_make_list(exp_make_atom("unquote"), read(infile), NULL);
+      unget(c, input);
+      return exp_make_list(exp_make_atom("unquote"), read(input), NULL);
     }
   case ';':
-    eat_until(infile, '\n');
-    return read(infile);
+    eat_until(input, '\n');
+    return read(input);
   default:
-    unget(c, infile);
-    return read_atom(infile);
+    unget(c, input);
+    return read_atom(input);
   }
 }
 
-static void eat_while(FILE *infile, int (*pred)(int c)) {
+static void eat_while(FILE *input, int (*pred)(int c)) {
   for (;;) {
-    int c = get(infile);
+    int c = get(input);
     if (!(*pred)(c)) {
-      unget(c, infile);
+      unget(c, input);
       return;
     }
   }
 }
 
-static void eat_space(FILE *infile) {
-  eat_while(infile, &isspace);
+static void eat_space(FILE *input) {
+  eat_while(input, &isspace);
 }
 
-static void eat_until(FILE *infile, int c) {
+static void eat_until(FILE *input, int c) {
   for (;;) {
-    if (c == get(infile)) {
+    if (c == get(input)) {
       return;
     }
   }
 }
 
-static struct exp *read_atom(FILE *infile) {
+static struct exp *read_atom(FILE *input) {
   struct strbuf *buf = strbuf_new(0);
   for (;;) {
-    int c = get(infile);
+    int c = get(input);
     if (isspace(c) || c == '(' || c == ')') {
-      unget(c, infile);
+      unget(c, input);
       char *str = strbuf_to_cstr(buf);
       struct exp *e = exp_make_atom(str);
       free(str);
@@ -94,34 +94,34 @@ static struct exp *read_atom(FILE *infile) {
   }
 }
 
-static struct exp *read_pair(FILE *infile) {
+static struct exp *read_pair(FILE *input) {
   int c;
-  eat_space(infile);
-  if ((c = get(infile)) == ')') {
+  eat_space(input);
+  if ((c = get(input)) == ')') {
     return NIL;
   } else {
-    unget(c, infile);
-    struct exp *exp = read(infile);
+    unget(c, input);
+    struct exp *exp = read(input);
     if (exp_symbol_eq(exp, ".")) {
-      exp = read(infile);
-      eat_space(infile);
-      if ((c = get(infile)) != ')') {
-        unget(c, infile);
+      exp = read(input);
+      eat_space(input);
+      if ((c = get(input)) != ')') {
+        unget(c, input);
         return err_error("bad dot syntax");
       }
       return exp;
     } else {
-      return exp_make_pair(exp, read_pair(infile));
+      return exp_make_pair(exp, read_pair(input));
     }
   }
 }
 
-static struct exp *read_string(FILE *infile) {
+static struct exp *read_string(FILE *input) {
   struct strbuf *buf = strbuf_new(0);
   int c;
-  while ((c = get(infile)) != '"') {
+  while ((c = get(input)) != '"') {
     if (c == '\\') {
-      c = get(infile);
+      c = get(input);
       if (c == 'n') {
         strbuf_push(buf, '\n');
       } else {
@@ -136,27 +136,27 @@ static struct exp *read_string(FILE *infile) {
   return string;
 }
 
-static struct exp *read_vector(FILE *infile) {
+static struct exp *read_vector(FILE *input) {
   struct exp *vector = exp_make_vector(0);
   int c;
-  eat_space(infile);
-  while ((c = get(infile)) != ')') {
-    unget(c, infile);
-    vector_push(vector->value.vector, read(infile));
-    eat_space(infile);
+  eat_space(input);
+  while ((c = get(input)) != ')') {
+    unget(c, input);
+    vector_push(vector->value.vector, read(input));
+    eat_space(input);
   }
   return vector;
 }
 
-static struct exp *read_char(FILE *infile) {
+static struct exp *read_char(FILE *input) {
   int c;
   struct strbuf *buf = strbuf_new(0);
   for (;;) {
-    c = get(infile);
+    c = get(input);
     if (isgraph(c)) {
       strbuf_push(buf, c);
     } else {
-      unget(c, infile);
+      unget(c, input);
       break;
     }
   }
@@ -178,13 +178,13 @@ static struct exp *read_char(FILE *infile) {
   }
 }
 
-static struct exp *read_hash(FILE *infile) {
-  int c = get(infile);
+static struct exp *read_hash(FILE *input) {
+  int c = get(input);
   switch (c) {
   case '(':
-    return read_vector(infile);
+    return read_vector(input);
   case '\\':
-    return read_char(infile);
+    return read_char(input);
   case 't':
     return TRUE;
   case 'f':

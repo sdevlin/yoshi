@@ -13,21 +13,21 @@
 
 struct env global_env;
 
-static FILE *infile;
+static FILE *input;
 
 int main(int argc, char **argv) {
   config_init(argc, argv);
   (*gc->init)();
   builtin_define(&global_env);
-  infile = config_next_file();
+  input = config_next_file();
   for (;;) {
     struct exp *e;
-    if (infile == stdin) {
+    if (input == stdin) {
       printf("yoshi> ");
     }
     if (!err_init()) {
-      if ((e = read(infile)) == NULL) {
-        if ((infile = config_next_file()) == NULL) {
+      if ((e = read(input)) == NULL) {
+        if ((input = config_next_file()) == NULL) {
           return 0;
         } else {
           continue;
