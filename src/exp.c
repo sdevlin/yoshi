@@ -146,12 +146,12 @@ int exp_symbol_eq(struct exp *exp, const char *s) {
   return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
 }
 
-struct char_mapping {
+struct char_name {
   const char *name;
   int value;
 };
 
-static struct char_mapping char_map[] = {
+static struct char_name char_names[] = {
   { .name = "alarm", .value = '\a' },
   { .name = "backspace", .value = '\b' },
   { .name = "delete", .value = 0x7f },
@@ -167,9 +167,9 @@ static struct char_mapping char_map[] = {
 
 int exp_name_to_char(const char *name) {
   size_t i;
-  for (i = 0; i < NELEM(char_map); i += 1) {
-    if (!strcmp(name, char_map[i].name)) {
-      return char_map[i].value;
+  for (i = 0; i < NELEM(char_names); i += 1) {
+    if (!strcmp(name, char_names[i].name)) {
+      return char_names[i].value;
     }
   }
   return -1;
@@ -177,9 +177,9 @@ int exp_name_to_char(const char *name) {
 
 const char *exp_char_to_name(int c) {
   size_t i;
-  for (i = 0; i < NELEM(char_map); i += 1) {
-    if (c == char_map[i].value) {
-      return char_map[i].name;
+  for (i = 0; i < NELEM(char_names); i += 1) {
+    if (c == char_names[i].value) {
+      return char_names[i].name;
     }
   }
   return NULL;
