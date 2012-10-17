@@ -129,6 +129,7 @@ static struct exp *expand_lambda(struct exp *exp) {
   switch (params->type) {
   case PAIR:
     {
+      /* FIX need to check param symbols for uniqueness */
       struct exp *param = params;
       while (param != NIL) {
         if (IS(param, PAIR)) {
