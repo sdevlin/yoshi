@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 
 #include "config.h"
@@ -211,6 +212,16 @@ static struct exp *fn_eval(struct exp *args) {
   return eval(CAR(args), &global_env);
 }
 
+static struct exp *fn_about(struct exp *args) {
+  err_ensure(exp_list_length(args) == 0,
+             "about requires exactly zero arguments");
+  const char *about = ("I'm not much more than an interpreter, "
+                       "and not very good at telling stories.");
+  char *buf = malloc(strlen(about) + 1);
+  strcpy(buf, about);
+  return exp_make_string(buf);
+}
+
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = (*gc->alloc_exp)(FUNCTION);
@@ -240,5 +251,6 @@ void builtin_define(struct env *env) {
   DEFUN("vector-length", fn_vector_length);
   DEFUN("vector-ref", fn_vector_ref);
   DEFUN("eval", fn_eval);
+  DEFUN("about", fn_about);
 #undef DEFUN
 }
