@@ -40,6 +40,10 @@ $(TARGET): $(OBJS)
 	@sed -e 's/.*://' -e 's/\\$$//' <$*.d.tmp | fmt -1 | sed -e 's/^ *//' -e 's/$$/:/' >>$*.d
 	@rm -f $*.d.tmp
 
+tags:
+	rm -f TAGS
+	find src -name '*.[ch]' | xargs etags -a
+
 check-syntax:
 	$(CC) -o /dev/null -S $(CHK_SOURCES)
 
@@ -49,4 +53,4 @@ clobber: clean
 clean:
 	rm -f $(OBJS) $(DEPS) || true
 
-.PHONY: dev prof release install check-syntax clobber clean
+.PHONY: dev prof release install tags check-syntax clobber clean
