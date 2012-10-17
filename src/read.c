@@ -167,7 +167,7 @@ static struct exp *read_char(FILE *input) {
   } else if (strlen(name) == 1) {
     return exp_make_character(*name);
   } else if (*name == 'x') {
-    // handle raw hex
+    /* handle raw hex */
     return err_error("read_char: hex characters not implemented");
   } else {
     int c = exp_name_to_char(name);
@@ -204,8 +204,8 @@ static int get(FILE *stream) {
   }
 }
 
-// simple wrapper to ungetc
-// provided for symmetry with get
+/* simple wrapper to ungetc */
+/* provided for symmetry with get */
 static void unget(int c, FILE *stream) {
   ungetc(c, stream);
 }

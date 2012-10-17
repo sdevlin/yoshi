@@ -22,7 +22,7 @@
   }
 
 struct exp *env_lookup(struct env *env, struct exp *symbol) {
-  err_ensure(symbol->type == SYMBOL, "env: expected symbol");
+  err_ensure(IS(symbol, SYMBOL), "env: expected symbol");
   FOREACH_ENV({
       FOREACH_BINDING({
           IF_FOUND({
@@ -35,7 +35,7 @@ struct exp *env_lookup(struct env *env, struct exp *symbol) {
 
 struct exp *env_update(struct env *env, struct exp *symbol,
                        struct exp *value) {
-  err_ensure(symbol->type == SYMBOL, "env: expected symbol");
+  err_ensure(IS(symbol, SYMBOL), "env: expected symbol");
   FOREACH_ENV({
       FOREACH_BINDING({
           IF_FOUND({
@@ -49,7 +49,7 @@ struct exp *env_update(struct env *env, struct exp *symbol,
 
 struct exp *env_define(struct env *env, struct exp *symbol,
                        struct exp *value) {
-  err_ensure(symbol->type == SYMBOL, "env: expected symbol");
+  err_ensure(IS(symbol, SYMBOL), "env: expected symbol");
   FOREACH_BINDING({
       IF_FOUND({
           b->value = value;

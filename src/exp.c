@@ -38,7 +38,7 @@ struct exp *exp_make_atom(const char *str) {
     case SYMBOL:
       return exp_make_symbol(str);
     case FIXNUM:
-      // not handling overflow
+      /* not handling overflow */
       return exp_make_fixnum(strtol(str, NULL, 10));
     default:
       return err_error("unexpected atom type");
@@ -143,7 +143,7 @@ struct exp *exp_copy(struct exp *exp) {
 }
 
 int exp_symbol_eq(struct exp *exp, const char *s) {
-  return exp->type == SYMBOL && !strcmp(exp->value.symbol, s);
+  return IS(exp, SYMBOL) && !strcmp(exp->value.symbol, s);
 }
 
 struct char_name {
@@ -151,7 +151,7 @@ struct char_name {
   int value;
 };
 
-static struct char_name char_names[] = {
+static struct char_name char_map[] = {
   { .name = "alarm", .value = '\a' },
   { .name = "backspace", .value = '\b' },
   { .name = "delete", .value = 0x7f },
@@ -167,9 +167,9 @@ static struct char_name char_names[] = {
 
 int exp_name_to_char(const char *name) {
   size_t i;
-  for (i = 0; i < NELEM(char_names); i += 1) {
-    if (!strcmp(name, char_names[i].name)) {
-      return char_names[i].value;
+  for (i = 0; i < NELEM(char_map); i += 1) {
+    if (!strcmp(name, char_map[i].name)) {
+      return char_map[i].value;
     }
   }
   return -1;
@@ -177,9 +177,9 @@ int exp_name_to_char(const char *name) {
 
 const char *exp_char_to_name(int c) {
   size_t i;
-  for (i = 0; i < NELEM(char_names); i += 1) {
-    if (c == char_names[i].value) {
-      return char_names[i].name;
+  for (i = 0; i < NELEM(char_map); i += 1) {
+    if (c == char_map[i].value) {
+      return char_map[i].name;
     }
   }
   return NULL;
@@ -197,6 +197,10 @@ size_t exp_list_length(struct exp *list) {
   return len;
 }
 
+int exp_list_tagged(struct exp *list, const char *symbol) {
+  return IS(list, PAIR) && exp_symbol_eq(CAR(list), symbol);
+}
+
 int exp_list_proper(struct exp *list) {
   struct exp *a = list;
   struct exp *b = list;
@@ -204,6 +208,8 @@ int exp_list_proper(struct exp *list) {
   do {                                          \
     if (x == NIL) {                             \
       return 1;                                 \
+    } else if (!IS(x, PAIR)) {                  \
+      return 0;                                 \
     }                                           \
     x = CDR(x);                                 \
   } while (0)
@@ -216,6 +222,19 @@ int exp_list_proper(struct exp *list) {
     }
   }
 #undef NEXT
+}
+
+struct exp *exp_list_map(struct exp *list,
+                         struct exp *(*fn)(struct exp *list,
+                                           void *data),
+                         void *data) {
+  if (list == NIL) {
+    return NIL;
+  } else {
+    struct exp *first = (*fn)(CAR(list), data);
+    struct exp *rest = exp_list_map(CDR(list), fn, data);
+    return exp_make_pair(first, rest);
+  }
 }
 
 struct exp *exp_nth(struct exp *list, size_t n) {
@@ -340,7 +359,7 @@ char *exp_stringify(struct exp *exp) {
         CAT(s);
         free(s);
         exp = exp->value.pair.rest;
-        if (exp->type == PAIR) {
+        if (IS(exp, PAIR)) {
           CAT(" ");
         } else if (exp == NIL) {
           break;

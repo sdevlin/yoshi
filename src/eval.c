@@ -9,18 +9,11 @@
 
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
-static int is_tagged(struct exp *exp, const char *s);
 static int is_apply(struct exp *exp);
 static struct exp *expand_quasiquote(struct exp *exp);
-static struct exp *expand_and(struct exp *and);
-/* need hygienic macros to do this properly as an expansion */
-/* static struct exp *expand_or(struct exp *or); */
-static struct exp *expand_cond(struct exp *cond);
+static struct exp *map_eval(struct exp *exp, void *data);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
-static struct exp *map_list(struct exp *list, struct env *env,
-                            struct exp *(*fn)(struct exp *exp,
-                                              struct env *env));
 
 struct exp *eval(struct exp *exp, struct env *env) {
   for (;;) {
@@ -33,35 +26,22 @@ struct exp *eval(struct exp *exp, struct env *env) {
       return exp;
     } else if (is_var(exp)) {
       return env_lookup(env, exp);
-    } else if (is_tagged(exp, "quote")) {
-      err_ensure(exp_list_length(exp) == 2,
-                 "eval: bad syntax in quote");
-      return exp_nth(exp, 1);
-    } else if (is_tagged(exp, "quasiquote")) {
-      exp = expand_quasiquote(exp_nth(exp, 1));
-    } else if (is_tagged(exp, "set!")) {
-      return env_update(env, exp_nth(exp, 1), eval(exp_nth(exp, 2), env));
-    } else if (is_tagged(exp, "define")) {
-      struct exp *id = CAR(CDR(exp));
-      switch (id->type) {
-      case SYMBOL:
-        return env_define(env, exp_nth(exp, 1), eval(exp_nth(exp, 2), env));
-      case PAIR:
-        return env_define(env, CAR(id), exp_make_closure(CDR(id),
-                                                         CDR(CDR(exp)),
-                                                         env));
-      default:
-        return err_error("define: bad syntax");
-      }
-    } else if (is_tagged(exp, "if")) {
-      if (eval(exp_nth(exp, 1), env) != FALSE) {
-        exp = exp_nth(exp, 2);
+    } else if (exp_list_tagged(exp, "quote")) {
+      return CADR(exp);
+    } else if (exp_list_tagged(exp, "quasiquote")) {
+      exp = expand_quasiquote(CADR(exp));
+    } else if (exp_list_tagged(exp, "set!")) {
+      return env_update(env, CADR(exp), eval(CADDR(exp), env));
+    } else if (exp_list_tagged(exp, "define")) {
+      struct exp *id = CADR(exp);
+      return env_define(env, id, eval(CADDR(exp), env));
+    } else if (exp_list_tagged(exp, "if")) {
+      if (eval(CADR(exp), env) != FALSE) {
+        exp = CADDR(exp);
       } else {
-        exp = exp_nth(exp, 3);
+        exp = CADDDR(exp);
       }
-    } else if (is_tagged(exp, "and")) {
-      exp = expand_and(CDR(exp));
-    } else if (is_tagged(exp, "or")) {
+    } else if (exp_list_tagged(exp, "or")) { /* need to get rid of this */
       exp = CDR(exp);
       if (exp == NIL) {
         return FALSE;
@@ -75,9 +55,9 @@ struct exp *eval(struct exp *exp, struct env *env) {
         }
         exp = CAR(exp);
       }
-    } else if (is_tagged(exp, "lambda")) {
-      return exp_make_closure(exp_nth(exp, 1), CDR(CDR(exp)), env);
-    } else if (is_tagged(exp, "begin")) {
+    } else if (exp_list_tagged(exp, "lambda")) {
+      return exp_make_closure(CADR(exp), CADDR(exp), env);
+    } else if (exp_list_tagged(exp, "begin")) {
       exp = CDR(exp);
       if (exp == NIL) {
         return OK;
@@ -88,12 +68,10 @@ struct exp *eval(struct exp *exp, struct env *env) {
         }
         exp = CAR(exp);
       }
-    } else if (is_tagged(exp, "cond")) {
-      exp = expand_cond(CDR(exp));
     } else if (is_apply(exp)) {
       struct exp *fn;
       struct exp *args;
-      exp = map_list(exp, env, &eval);
+      exp = exp_list_map(exp, &map_eval, env);
       fn = CAR(exp);
       args = CDR(exp);
       switch (fn->type) {
@@ -103,15 +81,6 @@ struct exp *eval(struct exp *exp, struct env *env) {
         env = extend_env(fn->value.closure.params, args,
                          fn->value.closure.env);
         exp = fn->value.closure.body;
-        if (exp == NIL) {
-          return OK;
-        } else {
-          while (CDR(exp) != NIL) {
-            eval(CAR(exp), env);
-            exp = CDR(exp);
-          }
-          exp = CAR(exp);
-        }
         break;
       default:
         return err_error("eval: bad function type");
@@ -122,36 +91,24 @@ struct exp *eval(struct exp *exp, struct env *env) {
   }
 }
 
-static struct exp *map_list(struct exp *list, struct env *env,
-                            struct exp *(*fn)(struct exp *exp,
-                                              struct env *env)) {
-  if (list == NIL) {
-    return NIL;
-  } else {
-    struct exp *first = (*fn)(CAR(list), env);
-    struct exp *rest = map_list(CDR(list), env, fn);
-    return exp_make_pair(first, rest);
-  }
-}
-
-// doesn't handle nested quasiquote
+/* doesn't handle nested quasiquote */
 static struct exp *expand_quasiquote(struct exp *exp) {
-  if (exp->type != PAIR) {
+  if (!IS(exp, PAIR)) {
     return exp_make_list(exp_make_symbol("quote"),
                          exp,
                          NULL);
   }
-  err_ensure(!is_tagged(exp, "unquote-splicing"),
+  err_ensure(!exp_list_tagged(exp, "unquote-splicing"),
              "expand_quasiquote: unexpected unquote-splicing");
-  if (is_tagged(exp, "unquote")) {
+  if (exp_list_tagged(exp, "unquote")) {
     err_ensure(exp_list_length(exp) == 2,
                "expand_quasiquote: bad syntax in unquote");
-    return exp_nth(exp, 1);
-  } else if (is_tagged(CAR(exp), "unquote-splicing")) {
+    return CADR(exp);
+  } else if (exp_list_tagged(CAR(exp), "unquote-splicing")) {
     err_ensure(exp_list_length(CAR(exp)) == 2,
                "expand_quasiquote: bad syntax in unquote-splicing");
     return exp_make_list(exp_make_symbol("append"),
-                         exp_nth(CAR(exp), 1),
+                         CADR(CAR(exp)),
                          expand_quasiquote(CDR(exp)),
                          NULL);
   } else {
@@ -162,53 +119,26 @@ static struct exp *expand_quasiquote(struct exp *exp) {
   }
 }
 
-static struct exp *expand_and(struct exp *and) {
-  size_t length = exp_list_length(and);
-  switch (length) {
-  case 0:
-    return TRUE;
-  case 1:
-    return CAR(and);
-  default:
-    return exp_make_list(exp_make_atom("if"),
-                         CAR(and),
-                         expand_and(CDR(and)),
-                         FALSE,
-                         NULL);
-  }
-}
-
-static struct exp *expand_cond(struct exp *conds) {
-  if (conds == NIL) {
-    return OK;
-  } else {
-    struct exp *pred = CAR(CAR(conds));
-    return exp_make_list(exp_make_atom("if"),
-                         exp_symbol_eq(pred, "else") ? TRUE : pred,
-                         exp_nth(CAR(conds), 1),
-                         expand_cond(CDR(conds)),
-                         NULL);
-  }
-}
-
 static int is_self_eval(struct exp *exp) {
-#define TYPEOF(t) (exp->type == (t))
-  return TYPEOF(FIXNUM) || TYPEOF(BOOLEAN) || TYPEOF(STRING) ||
-    TYPEOF(CHARACTER) || TYPEOF(VECTOR) || TYPEOF(CLOSURE) ||
-    TYPEOF(FUNCTION);
-#undef TYPEOF
+  return (IS(exp, UNDEFINED) ||
+          IS(exp, FIXNUM) ||
+          IS(exp, STRING) ||
+          IS(exp, CHARACTER) ||
+          IS(exp, BOOLEAN) ||
+          IS(exp, BYTEVECTOR));
 }
 
 static int is_var(struct exp *exp) {
-  return exp->type == SYMBOL;
-}
-
-static int is_tagged(struct exp *exp, const char *s) {
-  return exp->type == PAIR && exp_symbol_eq(CAR(exp), s);
+  return IS(exp, SYMBOL);
 }
 
 static int is_apply(struct exp *exp) {
-  return exp->type == PAIR;
+  return IS(exp, PAIR);
+}
+
+static struct exp *map_eval(struct exp *exp, void *data) {
+  struct env *env = data;
+  return eval(exp, env);
 }
 
 static struct env *extend_env(struct exp *params, struct exp *args,
@@ -219,17 +149,17 @@ static struct env *extend_env(struct exp *params, struct exp *args,
       return env;
     } else if (params == NIL) {
       return err_error("apply: too many args");
-    } else if (params->type == PAIR) {
+    } else if (IS(params, PAIR)) {
       if (args == NIL) {
         return err_error("apply: too few args");
       }
-      // ignore non-symbol params
-      if (CAR(params)->type == SYMBOL) {
+      /* FIX non-symbol params should be an error */
+      if (IS(CAR(params), SYMBOL)) {
         env_define(env, CAR(params), CAR(args));
       }
       params = CDR(params);
       args = CDR(args);
-    } else if (params->type == SYMBOL) {
+    } else if (IS(params, SYMBOL)) {
       env_define(env, params, args);
       return env;
     }

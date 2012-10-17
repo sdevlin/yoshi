@@ -52,7 +52,7 @@ static struct frame *frame_new(size_t capacity) {
 static void frame_trim(struct frame *frame) {
   size_t capacity = (frame->next - frame->data) * 10;
   capacity = capacity > frame_min_size ? capacity : frame_min_size;
-  // log if capacity < frame->capacity
+  /* log if capacity < frame->capacity */
   frame->capacity = capacity;
   frame->data = realloc(frame->data, frame->capacity * sizeof *frame->data);
 }
@@ -168,7 +168,7 @@ static struct exp *gc_copy_exp(struct exp *exp) {
   return exp;
 }
 
-// it would be nice if this only traversed global_env once
+/* it would be nice if this only traversed global_env once */
 static struct env *gc_copy_env(struct env *env) {
   MAYBE_COPY(env);
   struct binding *b = env->bindings;

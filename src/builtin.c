@@ -6,44 +6,45 @@
 #include "env.h"
 #include "err.h"
 #include "gc.h"
+#include "expand.h"
 #include "eval.h"
 #include "util/vector.h"
 
 static struct exp *fn_number_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "number? requires exactly one argument");
-  return CAR(args)->type == FIXNUM ? TRUE : FALSE;
+  return IS(CAR(args), FIXNUM) ? TRUE : FALSE;
 }
 
 static struct exp *fn_pair_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "pair? requires exactly one argument");
-  return CAR(args)->type == PAIR ? TRUE : FALSE;
+  return IS(CAR(args), PAIR) ? TRUE : FALSE;
 }
 
 static struct exp *fn_vector_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "vector? requires exactly one argument");
-  return CAR(args)->type == VECTOR ? TRUE : FALSE;
+  return IS(CAR(args), VECTOR) ? TRUE : FALSE;
 }
 
 static struct exp *fn_symbol_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "symbol? requires exactly one argument");
-  return CAR(args)->type == SYMBOL ? TRUE : FALSE;
+  return IS(CAR(args), SYMBOL) ? TRUE : FALSE;
 }
 
 static struct exp *fn_string_p(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "string? requires exactly one argument");
-  return CAR(args)->type == STRING ? TRUE : FALSE;
+  return IS(CAR(args), STRING) ? TRUE : FALSE;
 }
 
 static struct exp *fn_add(struct exp *args) {
   long acc = 0;
   while (args != NIL) {
     struct exp *e = CAR(args);
-    err_ensure(e->type == FIXNUM, "+ requires numeric arguments");
+    err_ensure(IS(e, FIXNUM), "+ requires numeric arguments");
     acc += e->value.fixnum;
     args = CDR(args);
   }
@@ -53,14 +54,14 @@ static struct exp *fn_add(struct exp *args) {
 static struct exp *fn_sub(struct exp *args) {
   size_t len = exp_list_length(args);
   err_ensure(len > 0, "- requires at least one argument");
-  err_ensure(CAR(args)->type == FIXNUM, "- requires numeric arguments");
+  err_ensure(IS(CAR(args), FIXNUM), "- requires numeric arguments");
   long acc = CAR(args)->value.fixnum;
   args = CDR(args);
   if (len == 1) {
     acc *= -1;
   } else {
     while (args != NIL) {
-      err_ensure(CAR(args)->type == FIXNUM, "- requires numeric arguments");
+      err_ensure(IS(CAR(args), FIXNUM), "- requires numeric arguments");
       acc -= CAR(args)->value.fixnum;
       args = CDR(args);
     }
@@ -72,7 +73,7 @@ static struct exp *fn_mul(struct exp *args) {
   long acc = 1;
   while (args != NIL) {
     struct exp *e = CAR(args);
-    err_ensure(e->type == FIXNUM, "* requires numeric arguments");
+    err_ensure(IS(e, FIXNUM), "* requires numeric arguments");
     acc *= e->value.fixnum;
     args = CDR(args);
   }
@@ -82,8 +83,8 @@ static struct exp *fn_mul(struct exp *args) {
 static struct exp *fn_div(struct exp *args) {
   err_ensure(exp_list_length(args) == 2, "div requires exactly two arguments");
   struct exp *a = CAR(args);
-  struct exp *b = exp_nth(args, 1);
-  err_ensure(a->type == FIXNUM && b->type == FIXNUM,
+  struct exp *b = CADR(args);
+  err_ensure(IS(a, FIXNUM) && IS(b, FIXNUM),
              "div requires numeric arguments");
   return exp_make_fixnum(a->value.fixnum / b->value.fixnum);
 }
@@ -91,17 +92,17 @@ static struct exp *fn_div(struct exp *args) {
 static struct exp *fn_mod(struct exp *args) {
   err_ensure(exp_list_length(args) == 2, "mod requires exactly two arguments");
   struct exp *a = CAR(args);
-  struct exp *b = exp_nth(args, 1);
-  err_ensure(a->type == FIXNUM && b->type == FIXNUM,
+  struct exp *b = CADR(args);
+  err_ensure(IS(a, FIXNUM) && IS(b, FIXNUM),
              "mod requires numeric arguments");
   return exp_make_fixnum(a->value.fixnum % b->value.fixnum);
 }
 
 static struct exp *fn_gt(struct exp *args) {
   err_ensure(exp_list_length(args) == 2, "> requires exactly two arguments");
-  struct exp *a = exp_nth(args, 0);
-  struct exp *b = exp_nth(args, 1);
-  err_ensure(a->type == FIXNUM && b->type == FIXNUM,
+  struct exp *a = CAR(args);
+  struct exp *b = CADR(args);
+  err_ensure(IS(a, FIXNUM) && IS(b, FIXNUM),
              "> requires numeric arguments");
   return a->value.fixnum > b->value.fixnum ? TRUE : FALSE;
 }
@@ -110,10 +111,10 @@ static struct exp *fn_eq(struct exp *args) {
   size_t len = exp_list_length(args);
   err_ensure(len >= 2, "= requires at least two arguments");
   struct exp *first = CAR(args);
-  err_ensure(first->type == FIXNUM, "= requires numeric arguments");
+  err_ensure(IS(first, FIXNUM), "= requires numeric arguments");
   args = CDR(args);
   while (args != NIL) {
-    err_ensure(CAR(args)->type == FIXNUM, "= requires numeric arguments");
+    err_ensure(IS(CAR(args), FIXNUM), "= requires numeric arguments");
     if (first->value.fixnum != CAR(args)->value.fixnum) {
       return FALSE;
     }
@@ -126,8 +127,8 @@ static struct exp *fn_eq_p(struct exp *args) {
   if (exp_list_length(args) < 2) {
     return TRUE;
   } else {
-    struct exp *a = exp_nth(args, 0);
-    struct exp *b = exp_nth(args, 1);
+    struct exp *a = CAR(args);
+    struct exp *b = CADR(args);
     if (a->type != b->type) {
       return FALSE;
     } else {
@@ -156,22 +157,20 @@ static struct exp *fn_eq_p(struct exp *args) {
 static struct exp *fn_cons(struct exp *args) {
   err_ensure(exp_list_length(args) == 2,
              "cons requires exactly two arguments");
-  struct exp *first = exp_nth(args, 0);
-  struct exp *rest = exp_nth(args, 1);
-  return exp_make_pair(first, rest);
+  return exp_make_pair(CAR(args), CADR(args));
 }
 
 static struct exp *fn_car(struct exp *args) {
   err_ensure(exp_list_length(args) == 1, "car requires exactly one argument");
   args = CAR(args);
-  err_ensure(args->type == PAIR, "car requires a pair argument");
+  err_ensure(IS(args, PAIR), "car requires a pair argument");
   return CAR(args);
 }
 
 static struct exp *fn_cdr(struct exp *args) {
   err_ensure(exp_list_length(args) == 1, "cdr requires exactly one argument");
   args = CAR(args);
-  err_ensure(args->type == PAIR, "cdr requires a pair argument");
+  err_ensure(IS(args, PAIR), "cdr requires a pair argument");
   return CDR(args);
 }
 
@@ -186,7 +185,7 @@ static struct exp *fn_vector_length(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "vector-length requires exactly one argument");
   struct exp *vector = CAR(args);
-  err_ensure(vector->type == VECTOR,
+  err_ensure(IS(vector, VECTOR),
              "vector-length requires a vector argument");
   return exp_make_fixnum(vector_length(vector->value.vector));
 }
@@ -196,9 +195,9 @@ static struct exp *fn_vector_ref(struct exp *args) {
              "vector-ref requires exactly two arguments");
   struct exp *vector = CAR(args);
   struct exp *index = CAR(CDR(args));
-  err_ensure(vector->type == VECTOR,
+  err_ensure(IS(vector, VECTOR),
              "vector-ref requires a vector argument");
-  err_ensure(index->type == FIXNUM,
+  err_ensure(IS(index, FIXNUM),
              "vector-ref requires a numeric index");
   long i = index->value.fixnum;
   err_ensure(i >= 0 && i < vector_length(vector->value.vector),
@@ -209,7 +208,13 @@ static struct exp *fn_vector_ref(struct exp *args) {
 static struct exp *fn_eval(struct exp *args) {
   err_ensure(exp_list_length(args) == 1,
              "eval requires exactly one argument");
-  return eval(CAR(args), &global_env);
+  return eval(expand(CAR(args)), &global_env);
+}
+
+static struct exp *fn_expand(struct exp *args) {
+  err_ensure(exp_list_length(args) == 1,
+             "expand requires exactly one argument");
+  return expand(CAR(args));
 }
 
 static struct exp *fn_about(struct exp *args) {
@@ -251,6 +256,7 @@ void builtin_define(struct env *env) {
   DEFUN("vector-length", fn_vector_length);
   DEFUN("vector-ref", fn_vector_ref);
   DEFUN("eval", fn_eval);
+  DEFUN("expand", fn_expand);
   DEFUN("about", fn_about);
 #undef DEFUN
 }

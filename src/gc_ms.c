@@ -156,7 +156,7 @@ static void gc_free(struct record *rec) {
     }
     break;
   default:
-    // error
+    /* error */
     break;
   }
   free(rec);

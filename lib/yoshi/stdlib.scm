@@ -1,9 +1,9 @@
-(define (void))
+(define (void)
+  (if #f #f))
 
+;; sort of broken
 (define (apply f args)
-  (define (quote-all l)
-    (map (lambda (x) `(quote ,x)) l))
-  (eval (quote-all `(,f ,@args))))
+  (eval `(,f ,@args)))
 
 (define (not x)
   (eq? x #f))
@@ -14,6 +14,7 @@
 (define (boolean? x)
   (or (eq? x #t) (eq? x #f)))
 
+;; doesn't work because apply doesn't really work
 (define (equal? . args)
   (define (eql? a b)
     (cond

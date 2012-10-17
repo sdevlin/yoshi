@@ -9,6 +9,7 @@ enum exp_type {
   STRING,
   CHARACTER,
   VECTOR,
+  BYTEVECTOR,                   /* not implemented */
   CLOSURE,
   FUNCTION,
   NIL_TYPE
@@ -47,6 +48,9 @@ extern struct exp true;
 extern struct exp false;
 #define FALSE (&false)
 
+/* maybe there should be globals for keywords */
+
+#define IS(exp, t) ((exp)->type == (t))
 extern struct exp *exp_make_atom(const char *str);
 extern struct exp *exp_make_symbol(const char *sym);
 extern struct exp *exp_make_list(struct exp *first, ...);
@@ -63,9 +67,19 @@ extern int exp_symbol_eq(struct exp *exp, const char *s);
 extern int exp_name_to_char(const char *name);
 extern const char *exp_char_to_name(int c);
 extern size_t exp_list_length(struct exp *list);
+extern int exp_list_tagged(struct exp *list, const char *symbol);
 extern int exp_list_proper(struct exp *list);
+extern struct exp *exp_list_map(struct exp *list,
+                                struct exp *(*fn)(struct exp *list,
+                                                  void *data),
+                                void *data);
 #define CAR(exp) (exp->value.pair.first)
 #define CDR(exp) (exp->value.pair.rest)
+#define CAAR(exp) CAR(CAR(exp)
+#define CADR(exp) CAR(CDR(exp))
+#define CDDR(exp) CDR(CDR(exp))
+#define CADDR(exp) CAR(CDDR(exp))
+#define CADDDR(exp) CAR(CDR(CDDR(exp)))
 extern struct exp *exp_nth(struct exp *list, size_t n);
 extern char *exp_stringify(struct exp *exp);
 #endif
