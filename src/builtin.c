@@ -202,15 +202,32 @@ static struct exp *fn_vector_ref(struct exp *args) {
   err_ensure(exp_list_length(args) == 2,
              "vector-ref requires exactly two arguments");
   struct exp *vector = CAR(args);
-  struct exp *index = CAR(CDR(args));
+  struct exp *k = CADR(args);
   err_ensure(IS(vector, VECTOR),
              "vector-ref requires a vector argument");
-  err_ensure(IS(index, FIXNUM),
+  err_ensure(IS(k, FIXNUM),
              "vector-ref requires a numeric index");
-  long i = index->value.fixnum;
+  size_t i = k->value.fixnum;
   err_ensure(i >= 0 && i < vector_length(vector->value.vector),
              "vector-ref requires a valid index");
   return vector_get(vector->value.vector, i);
+}
+
+static struct exp *fn_vector_set(struct exp *args) {
+  err_ensure(exp_list_length(args) == 3,
+             "vector-set! requires exactly two arguments");
+  struct exp *vector = CAR(args);
+  struct exp *k = CADR(args);
+  struct exp *obj = CADDR(args);
+  err_ensure(IS(vector, VECTOR),
+             "vector-set! requires a vector argument");
+  err_ensure(IS(k, FIXNUM),
+             "vector-set! requires a numeric index");
+  size_t i = k->value.fixnum;
+  err_ensure(i >= 0 && i < vector_length(vector->value.vector),
+             "vector-set! requires a valid index");
+  vector_put(vector->value.vector, i, obj);
+  return OK;
 }
 
 static struct exp *fn_eval(struct exp *args) {
@@ -265,6 +282,7 @@ void builtin_define(struct env *env) {
   DEFUN("make-vector", fn_make_vector);
   DEFUN("vector-length", fn_vector_length);
   DEFUN("vector-ref", fn_vector_ref);
+  DEFUN("vector-set!", fn_vector_set);
   DEFUN("eval", fn_eval);
   DEFUN("expand", fn_expand);
   DEFUN("about", fn_about);
