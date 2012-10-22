@@ -59,11 +59,11 @@
    ((pair? x) (list? (cdr x)))
    (else #f)))
 
-(define (map f l)
+(define (map proc list)
   (cond
-   ((null? l) '())
-   (else (cons (f (car l))
-               (map f (cdr l))))))
+   ((null? list) '())
+   (else (cons (proc (car list))
+               (map proc (cdr list))))))
 
 (define (filter f l)
   (cond
