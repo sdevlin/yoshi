@@ -83,3 +83,15 @@
         '()
         (cons m (iter (+ m 1)))))
   (iter 0))
+
+(define (vector-map proc vector)
+  (define length (vector-length vector))
+  (define new-vector (make-vector length))
+  (define (iter k)
+    (if (= k length)
+        new-vector
+        (begin
+          (vector-set! new-vector k
+                       (proc (vector-ref vector k)))
+          (iter (+ k 1)))))
+  (iter 0))
