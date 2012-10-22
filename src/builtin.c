@@ -230,7 +230,9 @@ static struct exp *fn_about(struct exp *args) {
 static void define_primitive(struct env *env, char *symbol,
                              struct exp *(*function)(struct exp *args)) {
   struct exp *e = (*gc->alloc_exp)(FUNCTION);
-  e->value.function = function;
+  e->value.function.fn = function;
+  e->value.function.name = malloc(strlen(symbol) + 1);
+  strcpy(e->value.function.name, symbol);
   env_define(env, exp_make_atom(symbol), e);
 }
 

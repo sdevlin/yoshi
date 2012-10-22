@@ -395,16 +395,21 @@ char *exp_stringify(struct exp *exp) {
       return str;
     }
   case FUNCTION:
-    str = malloc(13);
-    sprintf(str, "%s", "#<function>");
+    str = malloc(strlen(exp->value.function.name) + 14);
+    sprintf(str, "#<procedure:%s>", exp->value.function.name);
     return str;
   case CLOSURE:
-    str = malloc(12);
-    sprintf(str, "%s", "#<closure>");
+    if (exp->value.closure.name != NULL) {
+      str = malloc(strlen(exp->value.closure.name) + 14);
+      sprintf(str, "#<procedure:%s>", exp->value.closure.name);
+    } else {
+      str = malloc(13);
+      strcpy(str, "#<procedure>");
+    }
     return str;
   case UNDEFINED:
     str = malloc(13);
-    sprintf(str, "%s", "#<undefined>");
+    strcpy(str, "#<undefined>");
     return str;
   default:
     printf("exp type %d\n", exp->type);

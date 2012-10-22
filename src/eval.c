@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
 #include "exp.h"
@@ -34,7 +35,12 @@ struct exp *eval(struct exp *exp, struct env *env) {
       return env_update(env, CADR(exp), eval(CADDR(exp), env));
     } else if (exp_list_tagged(exp, "define")) {
       struct exp *id = CADR(exp);
-      return env_define(env, id, eval(CADDR(exp), env));
+      struct exp *value = eval(CADDR(exp), env);
+      if (IS(value, CLOSURE) && value->value.closure.name == NULL) {
+        value->value.closure.name = malloc(strlen(id->value.symbol) + 1);
+        strcpy(value->value.closure.name, id->value.symbol);
+      }
+      return env_define(env, id, value);
     } else if (exp_list_tagged(exp, "if")) {
       if (eval(CADR(exp), env) != FALSE) {
         exp = CADDR(exp);
@@ -76,7 +82,7 @@ struct exp *eval(struct exp *exp, struct env *env) {
       args = CDR(exp);
       switch (fn->type) {
       case FUNCTION:
-        return (*fn->value.function)(args);
+        return (*fn->value.function.fn)(args);
       case CLOSURE:
         env = extend_env(fn->value.closure.params, args,
                          fn->value.closure.env);

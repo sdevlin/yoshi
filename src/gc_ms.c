@@ -139,6 +139,12 @@ static void gc_free(struct record *rec) {
     case VECTOR:
       vector_free(&rec->data.exp.value.vector, NULL);
       break;
+    case FUNCTION:
+      free(rec->data.exp.value.function.name);
+      break;
+    case CLOSURE:
+      free(rec->data.exp.value.closure.name);
+      break;
     default:
       break;
     }

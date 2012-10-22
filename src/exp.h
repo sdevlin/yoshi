@@ -27,8 +27,12 @@ struct exp {
     char *string;
     char character;
     struct vector *vector;
-    struct exp *(*function)(struct exp *args);
     struct {
+      char *name;
+      struct exp *(*fn)(struct exp *args);
+    } function;
+    struct {
+      char *name;
       struct exp *params;
       struct exp *body;
       struct env *env;
