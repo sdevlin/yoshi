@@ -65,6 +65,15 @@ static void gc_mark_exp(struct exp *exp) {
     gc_mark_exp(exp->value.pair.first);
     gc_mark_exp(exp->value.pair.rest);
     break;
+  case VECTOR:
+    {
+      size_t i;
+      size_t length = vector_length(exp->value.vector);
+      for (i = 0; i < length; i += 1) {
+        gc_mark_exp(vector_get(exp->value.vector, i));
+      }
+      break;
+    }
   case CLOSURE:
     gc_mark_exp(exp->value.closure.params);
     gc_mark_exp(exp->value.closure.body);
