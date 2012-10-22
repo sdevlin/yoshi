@@ -178,7 +178,15 @@ static struct exp *fn_make_vector(struct exp *args) {
   size_t len = exp_list_length(args);
   err_ensure(len == 1 || len == 2,
              "make-vector requires exactly one or two arguments");
-  return OK;
+  struct exp *k = CAR(args);
+  err_ensure(k->type == FIXNUM, "make-vector requires a numeric argument");
+  struct exp *fill = len == 2 ? CADR(args) : NIL;
+  struct exp *v = exp_make_vector(0);
+  size_t i;
+  for (i = 0; i < k->value.fixnum; i += 1) {
+    vector_push(v->value.vector, fill);
+  }
+  return v;
 }
 
 static struct exp *fn_vector_length(struct exp *args) {
