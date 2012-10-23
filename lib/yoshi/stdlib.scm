@@ -1,18 +1,19 @@
+;; non-standard
 (define (void)
   (if #f #f))
 
 ;; sort of broken
-(define (apply f args)
-  (eval `(,f ,@args)))
+(define (apply proc args)
+  (eval `(,proc ,@args)))
 
-(define (not x)
-  (eq? x #f))
+(define (not obj)
+  (eq? obj #f))
 
-(define (null? x)
-  (eq? x '()))
+(define (null? obj)
+  (eq? obj '()))
 
-(define (boolean? x)
-  (or (eq? x #t) (eq? x #f)))
+(define (boolean? obj)
+  (or (eq? obj #t) (eq? obj #f)))
 
 ;; doesn't work because apply doesn't really work
 (define (equal? . args)
@@ -27,8 +28,8 @@
       (and (eql? (car args) (car (cdr args)))
            (apply equal? (cdr args)))))
 
-(define (zero? n)
-  (= n 0))
+(define (zero? z)
+  (= z 0))
 
 (define (< a b)
   (not (or (> a b) (= a b))))
