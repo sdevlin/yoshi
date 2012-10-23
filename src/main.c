@@ -9,26 +9,27 @@
 #include "read.h"
 #include "expand.h"
 #include "eval.h"
+#include "util/input.h"
 #include "print.h"
 #include "gc.h"
 
 struct env global_env;
 
-static FILE *input;
+static struct input *input;
 
 int main(int argc, char **argv) {
   config_init(argc, argv);
   (*gc->init)();
   builtin_define(&global_env);
-  input = config_next_file();
+  input = config_next_input();
   for (;;) {
     struct exp *e;
-    if (input == stdin) {
+    if (input->is_stdin(input)) {
       printf("yoshi> ");
     }
     if (!err_init()) {
       if ((e = read(input)) == NULL) {
-        if ((input = config_next_file()) == NULL) {
+        if ((input = config_next_input()) == NULL) {
           return 0;
         } else {
           continue;

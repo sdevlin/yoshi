@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "config.h"
+#include "util/file_input.h"
 #include "gc.h"
 
 static struct {
@@ -43,20 +44,20 @@ void config_init(int argc, char **argv) {
 #define PREFIX "."
 #endif
 
-FILE *config_next_file(void) {
+struct input *config_next_input(void) {
   static size_t i = 0;
   static int stdlib_loaded = 0;
   static int yield_stdin = 1;
   if (!stdlib_loaded) {
     stdlib_loaded = 1;
-    return fopen(PREFIX "/lib/yoshi/stdlib.scm", "r");
+    return file_input_new(fopen(PREFIX "/lib/yoshi/stdlib.scm", "r"));
   } else if (i < file_info.count) {
     FILE *f = fopen(*(file_info.names + i), "r");
     i += 1;
-    return f;
+    return file_input_new(f);
   } else if (yield_stdin && config.interactive) {
     yield_stdin = 0;
-    return stdin;
+    return file_input_new(stdin);
   } else {
     return NULL;
   }

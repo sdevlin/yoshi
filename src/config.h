@@ -1,7 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
-#include <stdio.h>
+#include "util/input.h"
 
 enum flag_type {
   OFF,
@@ -18,7 +18,7 @@ extern struct flags config;
 
 extern void config_init(int argc, char **argv);
 
-extern FILE *config_next_file(void);
+extern struct input *config_next_input(void);
 
 extern struct gc *gc;
 #endif

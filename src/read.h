@@ -1,4 +1,5 @@
 #ifndef READ_H
 #define READ_H
-extern struct exp *read(FILE *input);
+#include "util/input.h"
+extern struct exp *read(struct input *input);
 #endif

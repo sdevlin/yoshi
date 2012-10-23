@@ -5,21 +5,22 @@
 
 #include "exp.h"
 #include "err.h"
+#include "util/input.h"
 #include "util/strbuf.h"
 #include "util/vector.h"
 
-static int get(FILE *stream);
-static void unget(int c, FILE *stream);
+static int get(struct input *input);
+static void unget(struct input *input, int c);
 
-static void eat_while(FILE *input, int (*pred)(int c));
-static void eat_space(FILE *input);
-static void eat_until(FILE *input, int c);
-static struct exp *read_atom(FILE *input);
-static struct exp *read_pair(FILE *input);
-static struct exp *read_string(FILE *input);
-static struct exp *read_hash(FILE *input);
+static void eat_while(struct input *input, int (*pred)(int c));
+static void eat_space(struct input *input);
+static void eat_until(struct input *input, int c);
+static struct exp *read_atom(struct input *input);
+static struct exp *read_pair(struct input *input);
+static struct exp *read_string(struct input *input);
+static struct exp *read_hash(struct input *input);
 
-struct exp *read(FILE *input) {
+struct exp *read(struct input *input) {
   int c;
   eat_space(input);
   c = get(input);
@@ -43,33 +44,33 @@ struct exp *read(FILE *input) {
       return exp_make_list(exp_make_atom("unquote-splicing"),
                            read(input), NULL);
     } else {
-      unget(c, input);
+      unget(input, c);
       return exp_make_list(exp_make_atom("unquote"), read(input), NULL);
     }
   case ';':
     eat_until(input, '\n');
     return read(input);
   default:
-    unget(c, input);
+    unget(input, c);
     return read_atom(input);
   }
 }
 
-static void eat_while(FILE *input, int (*pred)(int c)) {
+static void eat_while(struct input *input, int (*pred)(int c)) {
   for (;;) {
     int c = get(input);
     if (!(*pred)(c)) {
-      unget(c, input);
+      unget(input, c);
       return;
     }
   }
 }
 
-static void eat_space(FILE *input) {
+static void eat_space(struct input *input) {
   eat_while(input, &isspace);
 }
 
-static void eat_until(FILE *input, int c) {
+static void eat_until(struct input *input, int c) {
   for (;;) {
     if (c == get(input)) {
       return;
@@ -77,12 +78,12 @@ static void eat_until(FILE *input, int c) {
   }
 }
 
-static struct exp *read_atom(FILE *input) {
+static struct exp *read_atom(struct input *input) {
   struct strbuf *buf = strbuf_new(0);
   for (;;) {
     int c = get(input);
     if (isspace(c) || c == '(' || c == ')') {
-      unget(c, input);
+      unget(input, c);
       char *str = strbuf_to_cstr(buf);
       struct exp *e = exp_make_atom(str);
       free(str);
@@ -94,19 +95,19 @@ static struct exp *read_atom(FILE *input) {
   }
 }
 
-static struct exp *read_pair(FILE *input) {
+static struct exp *read_pair(struct input *input) {
   int c;
   eat_space(input);
   if ((c = get(input)) == ')') {
     return NIL;
   } else {
-    unget(c, input);
+    unget(input, c);
     struct exp *exp = read(input);
     if (exp_symbol_eq(exp, ".")) {
       exp = read(input);
       eat_space(input);
       if ((c = get(input)) != ')') {
-        unget(c, input);
+        unget(input, c);
         return err_error("bad dot syntax");
       }
       return exp;
@@ -116,7 +117,7 @@ static struct exp *read_pair(FILE *input) {
   }
 }
 
-static struct exp *read_string(FILE *input) {
+static struct exp *read_string(struct input *input) {
   struct strbuf *buf = strbuf_new(0);
   int c;
   while ((c = get(input)) != '"') {
@@ -136,19 +137,19 @@ static struct exp *read_string(FILE *input) {
   return string;
 }
 
-static struct exp *read_vector(FILE *input) {
+static struct exp *read_vector(struct input *input) {
   struct exp *vector = exp_make_vector(0);
   int c;
   eat_space(input);
   while ((c = get(input)) != ')') {
-    unget(c, input);
+    unget(input, c);
     vector_push(vector->value.vector, read(input));
     eat_space(input);
   }
   return vector;
 }
 
-static struct exp *read_char(FILE *input) {
+static struct exp *read_char(struct input *input) {
   int c;
   struct strbuf *buf = strbuf_new(0);
   for (;;) {
@@ -156,7 +157,7 @@ static struct exp *read_char(FILE *input) {
     if (isgraph(c)) {
       strbuf_push(buf, c);
     } else {
-      unget(c, input);
+      unget(input, c);
       break;
     }
   }
@@ -178,7 +179,7 @@ static struct exp *read_char(FILE *input) {
   }
 }
 
-static struct exp *read_hash(FILE *input) {
+static struct exp *read_hash(struct input *input) {
   int c = get(input);
   switch (c) {
   case '(':
@@ -194,8 +195,8 @@ static struct exp *read_hash(FILE *input) {
   }
 }
 
-static int get(FILE *stream) {
-  int c = getc(stream);
+static int get(struct input *input) {
+  int c = input->get(input);
   if (isgraph(c) || isspace(c) || c == EOF) {
     return c;
   } else {
@@ -204,8 +205,6 @@ static int get(FILE *stream) {
   }
 }
 
-/* simple wrapper to ungetc */
-/* provided for symmetry with get */
-static void unget(int c, FILE *stream) {
-  ungetc(c, stream);
+static void unget(struct input *input, int c) {
+  input->unget(input, c);
 }
