@@ -40,6 +40,13 @@ static struct exp *fn_string_p(struct exp *args) {
   return IS(CAR(args), STRING) ? TRUE : FALSE;
 }
 
+static struct exp *fn_procedure_p(struct exp *args) {
+  err_ensure(exp_list_length(args) == 1,
+             "procedure? requires exactly one argument");
+  struct exp *obj = CAR(args);
+  return (IS(obj, FUNCTION) || IS(obj, CLOSURE)) ? TRUE : FALSE;
+}
+
 static struct exp *fn_add(struct exp *args) {
   long acc = 0;
   while (args != NIL) {
@@ -268,6 +275,7 @@ void builtin_define(struct env *env) {
   DEFUN("vector?", fn_vector_p);
   DEFUN("symbol?", fn_symbol_p);
   DEFUN("string?", fn_string_p);
+  DEFUN("procedure?", fn_procedure_p);
   DEFUN("+", fn_add);
   DEFUN("-", fn_sub);
   DEFUN("*", fn_mul);
