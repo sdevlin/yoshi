@@ -40,10 +40,94 @@
 (define (<= a b)
   (or (< a b) (= a b)))
 
-(define (length l)
+(define (caar pair)
+  (car (car pair)))
+
+(define (cadr pair)
+  (car (cdr pair)))
+
+(define (cdar pair)
+  (cdr (car pair)))
+
+(define (cddr pair)
+  (cdr (cdr pair)))
+
+(define (caaar pair)
+  (car (caar pair)))
+
+(define (caadr pair)
+  (car (cadr pair)))
+
+(define (cadar pair)
+  (car (cdar pair)))
+
+(define (caddr pair)
+  (car (cddr pair)))
+
+(define (cdaar pair)
+  (cdr (caar pair)))
+
+(define (cdadr pair)
+  (cdr (cadr pair)))
+
+(define (cddar pair)
+  (cdr (cdar pair)))
+
+(define (cdddr pair)
+  (cdr (cddr pair)))
+
+(define (caaaar pair)
+  (car (caaar pair)))
+
+(define (caaadr pair)
+  (car (caadr pair)))
+
+(define (caadar pair)
+  (car (cadar pair)))
+
+(define (caaddr pair)
+  (car (caddr pair)))
+
+(define (cadaar pair)
+  (car (cdaar pair)))
+
+(define (cadadr pair)
+  (car (cdadr pair)))
+
+(define (caddar pair)
+  (car (cddar pair)))
+
+(define (cadddr pair)
+  (car (cdddr pair)))
+
+(define (cdaaar pair)
+  (cdr (caaar pair)))
+
+(define (cdaadr pair)
+  (cdr (caadr pair)))
+
+(define (cdadar pair)
+  (cdr (cadar pair)))
+
+(define (cdaddr pair)
+  (cdr (caddr pair)))
+
+(define (cddaar pair)
+  (cdr (cdaar pair)))
+
+(define (cddadr pair)
+  (cdr (cdadr pair)))
+
+(define (cdddar pair)
+  (cdr (cddar pair)))
+
+(define (cddddr pair)
+  (cdr (cdddr pair)))
+
+(define (length list)
   (cond
-   ((null? l) 0)
-   (else (+ 1 (length (cdr l))))))
+   ((null? list) 0)
+   (else (+ 1 (length (cdr list))))))
 
 (define (append l1 l2)
   (cond
@@ -51,13 +135,13 @@
    (else (cons (car l1)
                (append (cdr l1) l2)))))
 
-(define (list . xs)
-  xs)
+(define (list . objs)
+  objs)
 
-(define (list? x)
+(define (list? obj)
   (cond
-   ((null? x) #t)
-   ((pair? x) (list? (cdr x)))
+   ((null? obj) #t)
+   ((pair? obj) (list? (cdr obj)))
    (else #f)))
 
 (define (map proc list)
@@ -66,17 +150,17 @@
    (else (cons (proc (car list))
                (map proc (cdr list))))))
 
-(define (filter f l)
+(define (filter proc list)
   (cond
-   ((null? l) '())
-   ((f (car l))
-    (cons (car l) (filter f (cdr l))))
-   (else (filter f (cdr l)))))
+   ((null? list) '())
+   ((proc (car list))
+    (cons (car list) (filter proc (cdr list))))
+   (else (filter proc (cdr list)))))
 
-(define (reduce f l acc)
+(define (reduce proc list acc)
   (cond
-   ((null? l) acc)
-   (else (reduce f (cdr l) (f (car l) acc)))))
+   ((null? list) acc)
+   (else (reduce proc (cdr list) (proc (car list) acc)))))
 
 (define (range n)
   (define (iter m)
