@@ -150,6 +150,13 @@
    (else (cons (proc (car list))
                (map proc (cdr list))))))
 
+(define (for-each proc list)
+  (cond
+   ((null? list) (void))
+   (else (begin
+           (proc (car list))
+           (for-each proc (cdr list))))))
+
 (define (filter proc list)
   (cond
    ((null? list) '())
@@ -180,3 +187,22 @@
                        (proc (vector-ref vector k)))
           (iter (+ k 1)))))
   (iter 0))
+
+(define (list->vector list)
+  (define length (length list))
+  (define vector (make-vector length))
+  (define (iter k list)
+    (if (null? list)
+        vector
+        (begin
+          (vector-set! vector k (car list))
+          (iter (+ k 1) (cdr list)))))
+  (iter 0 list))
+
+(define (vector . objs)
+  (list->vector objs))
+
+(define (call-with-current-continuation proc)
+  "Maybe later.")
+
+(define call/cc call-with-current-continuation)
