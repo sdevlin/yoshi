@@ -11,7 +11,6 @@
 static int is_self_eval(struct exp *exp);
 static int is_var(struct exp *exp);
 static int is_apply(struct exp *exp);
-static struct exp *expand_quasiquote(struct exp *exp);
 static struct exp *map_eval(struct exp *exp, void *data);
 static struct env *extend_env(struct exp *params, struct exp *args,
                               struct env *parent);
@@ -29,8 +28,6 @@ struct exp *eval(struct exp *exp, struct env *env) {
       return env_lookup(env, exp);
     } else if (exp_list_tagged(exp, "quote")) {
       return CADR(exp);
-    } else if (exp_list_tagged(exp, "quasiquote")) {
-      exp = expand_quasiquote(CADR(exp));
     } else if (exp_list_tagged(exp, "set!")) {
       return env_update(env, CADR(exp), eval(CADDR(exp), env));
     } else if (exp_list_tagged(exp, "define")) {
@@ -94,34 +91,6 @@ struct exp *eval(struct exp *exp, struct env *env) {
     } else {
       return err_error("eval: unknown exp type");
     }
-  }
-}
-
-/* doesn't handle nested quasiquote */
-static struct exp *expand_quasiquote(struct exp *exp) {
-  if (!IS(exp, PAIR)) {
-    return exp_make_list(exp_make_symbol("quote"),
-                         exp,
-                         NULL);
-  }
-  err_ensure(!exp_list_tagged(exp, "unquote-splicing"),
-             "expand_quasiquote: unexpected unquote-splicing");
-  if (exp_list_tagged(exp, "unquote")) {
-    err_ensure(exp_list_length(exp) == 2,
-               "expand_quasiquote: bad syntax in unquote");
-    return CADR(exp);
-  } else if (exp_list_tagged(CAR(exp), "unquote-splicing")) {
-    err_ensure(exp_list_length(CAR(exp)) == 2,
-               "expand_quasiquote: bad syntax in unquote-splicing");
-    return exp_make_list(exp_make_symbol("append"),
-                         CADR(CAR(exp)),
-                         expand_quasiquote(CDR(exp)),
-                         NULL);
-  } else {
-      return exp_make_list(exp_make_symbol("cons"),
-                           expand_quasiquote(CAR(exp)),
-                           expand_quasiquote(CDR(exp)),
-                           NULL);
   }
 }
 

@@ -87,6 +87,19 @@ struct exp *exp_make_vector(size_t len, ...) {
   return vector;
 }
 
+struct exp *exp_make_bytevector(size_t len, ...) {
+    va_list args;
+  size_t i;
+  struct exp *bytevector = (*gc->alloc_exp)(BYTEVECTOR);
+  bytevector->value.bytevector = vector_new(len);
+  va_start(args, len);
+  for (i = 0; i < len; i += 1) {
+    vector_push(bytevector->value.bytevector, va_arg(args, struct exp *));
+  }
+  va_end(args);
+  return bytevector;
+}
+
 struct exp *exp_make_string(char *str) {
   struct exp *string = (*gc->alloc_exp)(STRING);
   string->value.string = str;
@@ -185,7 +198,11 @@ const char *exp_char_to_name(int c) {
   return NULL;
 }
 
-#undef NELEM
+struct exp *exp_quote(struct exp *exp) {
+  return exp_make_list(exp_make_symbol("quote"),
+                       exp,
+                       NULL);
+}
 
 size_t exp_list_length(struct exp *list) {
   size_t len = 0;
@@ -241,6 +258,18 @@ struct exp *exp_nth(struct exp *list, size_t n) {
   return n == 0 ? CAR(list) : exp_nth(CDR(list), n - 1);
 }
 
+struct tag_syntax {
+  const char *tag;
+  const char *syntax;
+};
+
+static struct tag_syntax tag_map[] = {
+  { .tag = "quote", .syntax = "'" },
+  { .tag = "quasiquote", .syntax = "`" },
+  { .tag = "unquote", .syntax = "," },
+  { .tag = "unquote-splicing", .syntax = ",@" }
+};
+
 #define CAT(s)                                  \
   do {                                          \
     len += strlen(s);                           \
@@ -252,6 +281,7 @@ struct exp *exp_nth(struct exp *list, size_t n) {
     str[len] = '\0';                            \
   } while (0)
 
+/* holy cow, this function is now way too long */
 char *exp_stringify(struct exp *exp) {
   char *str;
   size_t len;
@@ -338,17 +368,22 @@ char *exp_stringify(struct exp *exp) {
     }
     return str;
   case PAIR:
-    if (exp_symbol_eq(CAR(exp), "quote")) {
-      size_t cap = 2;
-      str = malloc(cap);
-      len = 0;
-      str[len] = '\0';
-      CAT("'");
-      char *s = exp_stringify(CAR(CDR(exp)));
-      CAT(s);
-      free(s);
-      return str;
-    } else {
+    {
+      size_t i;
+      for (i = 0; i < NELEM(tag_map); i += 1) {
+        struct tag_syntax *mapping = &tag_map[i];
+        if (exp_symbol_eq(CAR(exp), mapping->tag)) {
+          size_t cap = strlen(mapping->syntax);
+          str = malloc(cap);
+          len = 0;
+          str[len] = '\0';
+          CAT(mapping->syntax);
+          char *s = exp_stringify(CAR(CDR(exp)));
+          CAT(s);
+          free(s);
+          return str;
+        }
+      } /* else */
       size_t cap = 1;
       str = malloc(cap);
       len = 0;
@@ -388,6 +423,26 @@ char *exp_stringify(struct exp *exp) {
           CAT(" ");
         }
         s = exp_stringify(vector_get(exp->value.vector, i));
+        CAT(s);
+        free(s);
+      }
+      CAT(")");
+      return str;
+    }
+  case BYTEVECTOR:
+    {
+      size_t i;
+      size_t cap = 1;
+      str = malloc(cap);
+      len = 0;
+      str[len] = '\0';
+      CAT("#u8(");
+      for (i = 0; i < vector_length(exp->value.bytevector); i += 1) {
+        char *s;
+        if (i > 0) {
+          CAT(" ");
+        }
+        s = exp_stringify(vector_get(exp->value.bytevector, i));
         CAT(s);
         free(s);
       }

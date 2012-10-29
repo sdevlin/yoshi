@@ -12,6 +12,7 @@
 static int get(struct input *input);
 static void unget(struct input *input, int c);
 
+static void expect(struct input *input, int c);
 static void eat_while(struct input *input, int (*pred)(int c));
 static void eat_space(struct input *input);
 static void eat_until(struct input *input, int c);
@@ -36,7 +37,7 @@ struct exp *read(struct input *input) {
   case '#':
     return read_hash(input);
   case '\'':
-    return exp_make_list(exp_make_atom("quote"), read(input), NULL);
+    return exp_quote(read(input));
   case '`':
     return exp_make_list(exp_make_atom("quasiquote"), read(input), NULL);
   case ',':
@@ -53,6 +54,12 @@ struct exp *read(struct input *input) {
   default:
     unget(input, c);
     return read_atom(input);
+  }
+}
+
+static void expect(struct input *input, int c) {
+  if (c != get(input)) {
+    err_error("read: unexpected character in input");
   }
 }
 
@@ -179,6 +186,18 @@ static struct exp *read_char(struct input *input) {
   }
 }
 
+static struct exp *read_bytevector(struct input *input) {
+  struct exp *bytevector = exp_make_bytevector(0);
+  int c;
+  eat_space(input);
+  while ((c = get(input)) != ')') {
+    unget(input, c);
+    vector_push(bytevector->value.vector, read(input));
+    eat_space(input);
+  }
+  return bytevector;
+}
+
 static struct exp *read_hash(struct input *input) {
   int c = get(input);
   switch (c) {
@@ -190,6 +209,10 @@ static struct exp *read_hash(struct input *input) {
     return TRUE;
   case 'f':
     return FALSE;
+  case 'u':
+    expect(input, '8');
+    expect(input, '(');
+    return read_bytevector(input);
   default:
     return err_error("bad syntax in #");
   }

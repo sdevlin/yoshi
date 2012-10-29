@@ -188,14 +188,13 @@ static struct exp *expand_cond(struct exp *exp) {
 }
 
 static struct exp *expand_and_tests(struct exp *exp) {
-  size_t length = exp_list_length(exp);
-  switch (length) {
+  switch (exp_list_length(exp)) {
   case 0:
     return TRUE;
   case 1:
     return CAR(exp);
   default:
-    return exp_make_list(exp_make_atom("if"),
+    return exp_make_list(exp_make_symbol("if"),
                          CAR(exp),
                          expand_and_tests(CDR(exp)),
                          FALSE,
@@ -209,12 +208,76 @@ static struct exp *expand_and(struct exp *exp) {
 }
 
 /* need some kind of hygienic macros to do this properly */
+static struct exp *expand_or_tests(struct exp *exp) {
+  switch (exp_list_length(exp)) {
+  case 0:
+    return FALSE;
+  case 1:
+    return CAR(exp);
+  default:
+    return exp_make_pair(exp_make_symbol("or"),
+                         exp);
+  }
+}
+
 static struct exp *expand_or(struct exp *exp) {
-  return exp_make_pair(CAR(exp), exp_list_map(CDR(exp), &map_expand, NULL));
+  err_ensure(exp_list_proper(exp), "expand: bad syntax in or");
+  return expand_or_tests(exp_list_map(CDR(exp), &map_expand, NULL));
+}
+
+static struct exp *expand_qq_template(struct exp *exp, size_t nesting) {
+  /* should be handling vectors here as well */
+  if (!IS(exp, PAIR)) {
+    return exp;
+  }
+  err_ensure(!exp_list_tagged(exp, "unquote-splicing"),
+             "expand: bad syntax in quasiquote");
+  if (exp_list_tagged(exp, "quasiquote")) {
+    err_ensure(exp_list_length(exp) == 2,
+               "expand: bad syntax in quasiquote");
+    struct exp *qq = exp_make_list(CAR(exp),
+                                   expand_qq_template(CADR(exp), nesting + 1),
+                                   NULL);
+    return nesting == 0 ? exp_quote(qq): qq;
+  } else if (exp_list_tagged(exp, "unquote")) {
+    err_ensure(exp_list_length(exp) == 2,
+               "expand: bad syntax in quasiquote");
+    return nesting == 0 ?
+      CADR(exp) :
+      exp_make_list(CAR(exp),
+                    expand_qq_template(CADR(exp), nesting - 1),
+                    NULL);
+  } else if (exp_list_tagged(CAR(exp), "unquote-splicing")) {
+    if (nesting == 0) {
+      struct exp *rest = expand_qq_template(CDR(exp), nesting);
+      return exp_make_list(exp_make_symbol("append"),
+                           CADR(CAR(exp)),
+                           rest == CDR(exp) ? exp_quote(rest) : rest,
+                           NULL);
+    } else {
+      return exp_make_list(NIL, NULL); /* placeholder */
+    }
+  } else {
+    struct exp *first = expand_qq_template(CAR(exp), nesting);
+    struct exp *rest = expand_qq_template(CDR(exp), nesting);
+    /* this logic is sort of ugly */
+    int is_literal = first == CAR(exp) && rest == CDR(exp);
+    if (first == CAR(exp)) {
+      first = exp_quote(first);
+    }
+    if (rest == CDR(exp)) {
+      rest = exp_quote(rest);
+    }
+    return is_literal ?
+      exp :
+      exp_make_list(exp_make_symbol("cons"), first, rest, NULL);
+  }
 }
 
 static struct exp *expand_quasiquote(struct exp *exp) {
-  return exp;
+  err_ensure(exp_list_length(exp) == 2,
+             "expand: bad syntax in quasiquote");
+  return expand_qq_template(CADR(exp), 0);
 }
 
 static struct exp *map_expand(struct exp *exp, void *data) {

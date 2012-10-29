@@ -10,6 +10,7 @@ enum exp_type {
   CHARACTER,
   VECTOR,
   BYTEVECTOR,                   /* not implemented */
+  PORT,                         /* needs input/output and textual/binary */
   CLOSURE,
   FUNCTION,
   NIL_TYPE
@@ -26,17 +27,21 @@ struct exp {
     char *symbol;
     char *string;
     char character;
+    struct vector *bytevector;
     struct vector *vector;
     struct {
-      char *name;
-      struct exp *(*fn)(struct exp *args);
-    } function;
+      struct input *input;
+    } port;
     struct {
       char *name;
       struct exp *params;
       struct exp *body;
       struct env *env;
     } closure;
+    struct {
+      char *name;
+      struct exp *(*fn)(struct exp *args);
+    } function;
   } value;
 };
 
@@ -59,6 +64,7 @@ extern struct exp *exp_make_atom(const char *str);
 extern struct exp *exp_make_symbol(const char *sym);
 extern struct exp *exp_make_list(struct exp *first, ...);
 extern struct exp *exp_make_vector(size_t len, ...);
+extern struct exp *exp_make_bytevector(size_t len, ...);
 extern struct exp *exp_make_string(char *str);
 extern struct exp *exp_make_character(int c);
 extern struct exp *exp_make_pair(struct exp *first, struct exp *rest);
@@ -70,6 +76,7 @@ extern struct exp *exp_copy(struct exp *exp);
 extern int exp_symbol_eq(struct exp *exp, const char *s);
 extern int exp_name_to_char(const char *name);
 extern const char *exp_char_to_name(int c);
+extern struct exp *exp_quote(struct exp *exp);
 extern size_t exp_list_length(struct exp *list);
 extern int exp_list_tagged(struct exp *list, const char *symbol);
 extern int exp_list_proper(struct exp *list);
