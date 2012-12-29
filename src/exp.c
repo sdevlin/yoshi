@@ -41,7 +41,7 @@ struct exp *exp_make_atom(const char *str) {
       /* not handling overflow */
       return exp_make_fixnum(strtol(str, NULL, 10));
     default:
-      return err_error("unexpected atom type");
+      return err_error("unexpected atom type", NULL);
     }
   }
 }
@@ -151,7 +151,7 @@ struct exp *exp_copy(struct exp *exp) {
   case STRING:
     return exp_make_string(exp->value.string);
   default:
-    return err_error("unsupported type for copying");
+    return err_error("unsupported type for copying", exp);
   }
 }
 
@@ -206,7 +206,8 @@ struct exp *exp_quote(struct exp *exp) {
 
 size_t exp_list_length(struct exp *list) {
   size_t len = 0;
-  err_ensure(exp_list_proper(list), "argument must be proper list");
+  err_ensure(exp_list_proper(list),
+             "argument must be proper list, got", list);
   while (list != NIL) {
     list = CDR(list);
     len += 1;
@@ -356,7 +357,7 @@ char *exp_stringify(struct exp *exp) {
     } else if (exp == FALSE) {
       strcpy(str, "#f");
     } else {
-      err_error("exp_stringify: bad boolean");
+      err_error("exp_stringify: bad boolean", NULL);
     }
     return str;
   case NIL_TYPE:
@@ -364,7 +365,7 @@ char *exp_stringify(struct exp *exp) {
     if (exp == NIL) {
       strcpy(str, "()");
     } else {
-      err_error("exp_stringify: bad constant");
+      err_error("exp_stringify: bad constant", NULL);
     }
     return str;
   case PAIR:
@@ -468,7 +469,7 @@ char *exp_stringify(struct exp *exp) {
     return str;
   default:
     printf("exp type %d\n", exp->type);
-    return err_error("exp_stringify: bad exp type");
+    return err_error("exp_stringify: bad exp type", NULL);
   }
 }
 

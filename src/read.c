@@ -31,7 +31,7 @@ struct exp *read(struct input *input) {
   case '(':
     return read_pair(input);
   case ')':
-    return err_error("extra close parenthesis");
+    return err_error("extra close parenthesis", NULL);
   case '"':
     return read_string(input);
   case '#':
@@ -59,7 +59,7 @@ struct exp *read(struct input *input) {
 
 static void expect(struct input *input, int c) {
   if (c != get(input)) {
-    err_error("read: unexpected character in input");
+    err_error("read: unexpected character in input", NULL);
   }
 }
 
@@ -115,7 +115,7 @@ static struct exp *read_pair(struct input *input) {
       eat_space(input);
       if ((c = get(input)) != ')') {
         unget(input, c);
-        return err_error("bad dot syntax");
+        return err_error("bad dot syntax", NULL);
       }
       return exp;
     } else {
@@ -171,16 +171,16 @@ static struct exp *read_char(struct input *input) {
   char *name = strbuf_to_cstr(buf);
   strbuf_free(buf);
   if (strlen(name) == 0) {
-    return err_error("read_char: zero-length character");
+    return err_error("read_char: zero-length character", NULL);
   } else if (strlen(name) == 1) {
     return exp_make_character(*name);
   } else if (*name == 'x') {
     /* handle raw hex */
-    return err_error("read_char: hex characters not implemented");
+    return err_error("read_char: hex characters not implemented", NULL);
   } else {
     int c = exp_name_to_char(name);
     if (c == -1) {
-      return err_error("read_char: unknown character name");
+      return err_error("read_char: unknown character name", NULL);
     }
     return exp_make_character(c);
   }
@@ -214,7 +214,7 @@ static struct exp *read_hash(struct input *input) {
     expect(input, '(');
     return read_bytevector(input);
   default:
-    return err_error("bad syntax in #");
+    return err_error("bad syntax in #", NULL);
   }
 }
 

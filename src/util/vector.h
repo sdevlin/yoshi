@@ -8,6 +8,7 @@ extern void vector_resize(struct vector *v, size_t length,
                           void (*item_free)(void *item));
 extern void *vector_get(struct vector *v, size_t index);
 extern void vector_put(struct vector *v, size_t index, void *item);
+extern void vector_insert(struct vector *v, size_t index, void *item);
 extern void vector_push(struct vector *v, void *item);
 extern void *vector_pop(struct vector *v);
 extern void *vector_peek(struct vector *v);

@@ -20,7 +20,7 @@ static struct input *input;
 int main(int argc, char **argv) {
   config_init(argc, argv);
   (*gc->init)();
-  builtin_define(&global_env);
+  builtin_defall(&global_env);
   input = config_next_input();
   for (;;) {
     struct exp *e;
@@ -40,7 +40,9 @@ int main(int argc, char **argv) {
         print(e);
       }
     } else {
-      printf("error: %s\n", err_msg);
+      char *msg = err_message();
+      printf("error: %s\n", msg);
+      free(msg);
     }
     (*gc->collect)();
   }

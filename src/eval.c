@@ -86,21 +86,28 @@ struct exp *eval(struct exp *exp, struct env *env) {
         exp = fn->value.closure.body;
         break;
       default:
-        return err_error("eval: bad function type");
+        return err_error("eval: bad function type", exp);
       }
     } else {
-      return err_error("eval: unknown exp type");
+      return err_error("eval: unknown exp type", exp);
     }
   }
 }
 
+/* the standard requires numbers, strings, characters, */
+/* booleans, and bytevectors to be self-evaluating. */
+/* i do not believe it forbids undefined or procedures */
+/* from also being self-evaluating. */
+/* lists, vectors, and nil are explicitly not self-evaluating. */
 static int is_self_eval(struct exp *exp) {
   return (IS(exp, UNDEFINED) ||
           IS(exp, FIXNUM) ||
           IS(exp, STRING) ||
           IS(exp, CHARACTER) ||
           IS(exp, BOOLEAN) ||
-          IS(exp, BYTEVECTOR));
+          IS(exp, BYTEVECTOR) ||
+          IS(exp, FUNCTION) ||
+          IS(exp, CLOSURE));
 }
 
 static int is_var(struct exp *exp) {
@@ -123,10 +130,10 @@ static struct env *extend_env(struct exp *params, struct exp *args,
     if (params == NIL && args == NIL) {
       return env;
     } else if (params == NIL) {
-      return err_error("apply: too many args");
+      return err_error("apply: too many args", NULL);
     } else if (IS(params, PAIR)) {
       if (args == NIL) {
-        return err_error("apply: too few args");
+        return err_error("apply: too few args", NULL);
       }
       /* FIX non-symbol params should be an error */
       if (IS(CAR(params), SYMBOL)) {

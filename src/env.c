@@ -22,7 +22,7 @@
   }
 
 struct exp *env_lookup(struct env *env, struct exp *symbol) {
-  err_ensure(IS(symbol, SYMBOL), "env: expected symbol");
+  err_ensure(IS(symbol, SYMBOL), "env: expected symbol, got", symbol);
   FOREACH_ENV({
       FOREACH_BINDING({
           IF_FOUND({
@@ -30,12 +30,12 @@ struct exp *env_lookup(struct env *env, struct exp *symbol) {
             });
         });
     });
-  return err_error("env: no binding for symbol");
+  return err_error("env: no binding for symbol", symbol);
 }
 
 struct exp *env_update(struct env *env, struct exp *symbol,
                        struct exp *value) {
-  err_ensure(IS(symbol, SYMBOL), "env: expected symbol");
+  err_ensure(IS(symbol, SYMBOL), "env: expected symbol, got", symbol);
   FOREACH_ENV({
       FOREACH_BINDING({
           IF_FOUND({
@@ -44,12 +44,12 @@ struct exp *env_update(struct env *env, struct exp *symbol,
             });
         });
     });
-  return err_error("env: no binding for symbol");
+  return err_error("env: no binding for symbol", symbol);
 }
 
 struct exp *env_define(struct env *env, struct exp *symbol,
                        struct exp *value) {
-  err_ensure(IS(symbol, SYMBOL), "env: expected symbol");
+  err_ensure(IS(symbol, SYMBOL), "env: expected symbol, got", symbol);
   FOREACH_BINDING({
       IF_FOUND({
           b->value = value;
