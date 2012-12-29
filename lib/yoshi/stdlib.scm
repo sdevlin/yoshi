@@ -2,9 +2,13 @@
 (define (void)
   (if #f #f))
 
-;; sort of broken
+;; slightly less elegant than i hoped for
+;; need to quote all args to account for list/vector literals
+;; e.g. (apply length '((1 (2 3) 4)))
 (define (apply proc args)
-  (eval `(,proc ,@args)))
+  (define quoted-args
+    (map (lambda (arg) (list 'quote arg)) args))
+  (eval `(,proc ,@quoted-args)))
 
 (define (not obj)
   (eq? obj #f))
@@ -15,7 +19,6 @@
 (define (boolean? obj)
   (or (eq? obj #t) (eq? obj #f)))
 
-;; doesn't work because apply doesn't really work
 (define (equal? . args)
   (define (eql? a b)
     (cond
@@ -25,7 +28,7 @@
      ((or (pair? a) (pair? b)) #f)
      (else (eq? a b))))
   (or (< (length args) 2)
-      (and (eql? (car args) (car (cdr args)))
+      (and (eql? (car args) (cadr args))
            (apply equal? (cdr args)))))
 
 (define (zero? z)
